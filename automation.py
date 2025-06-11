@@ -246,11 +246,53 @@ def run_nmap(domain: str,  amass_dir: str, nmap_dir: str) -> None:
     
     confirmation = input(f"Do you want to run nmap for {domain} ? (yes/no): ").strip().lower()
     mode = input("Enter the mode for nmap (passive/active): ").strip().lower()
-    nmap_command =["nmap", ""] 
+    
+    # Construire la commande nmap dans le bon ordre
+    nmap_command = ["nmap"]
+    
+    if mode == "active":
+        nmap_command.extend(["-sS", "-sV", "-sC", "-A", "-T4", "-p-", "--max-retries", "2", "--open"])
+        print("\033[91mARE YOU SURE YOU WANT TO RUN NMAP IN ACTIVE MODE ?\033[0m")
+        print("\033[93mThis Scan will be more intrusive and may trigger alerts on the target system.\033[0m")
+        print("\033[94mIt is using SYN scan, service version detection, script scanning, OS detection, and aggressive timing.\033[0m")
+        print("\033[92mIf you are not sure please select 'passive' option\033[0m")
+        # Ask for confirmation
+        confirmation = input("Do you want to proceed with the active scan? (yes/no): ").strip().lower()
+        if confirmation != "yes":
+            print("Active scan cancelled.")
+            return
+    elif mode == "passive":
+        nmap_command.extend(["-T3", "-Pn", "--top-ports", "100", "--open"])
+    else:
+        print("Invalid mode. Please enter 'passive' or 'active'.")
+        return
+    
+    if use_file_list:
+        nmap_command.extend(["-iL", live_hosts])
+    else:
+        nmap_command.append(domain)
+    # Ajouter l'option de sortie
+    nmap_command.extend(["-oN", f"{nmap_dir}/nmap_output.txt"])
+
+    if confirmation == "yes":
+        print(f"[-] Running nmap for {domain}...")
+        print(f"Nmap command: {' '.join(nmap_command)}")
+        try:
+            subprocess.run(nmap_command, check=True, capture_output=True, text=True)
+            print(f"Nmap output saved to {nmap_dir}/nmap_output.txt")
+        except subprocess.CalledProcessError as e:
+            print(f"Nmap command failed: {e}")
+            print(f"Error output (stderr): {e.stderr}")
+    else:
+       print(f"[-] Skipping nmap for {domain}.")
 
 
+def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
+    return
 
 
+def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
+    return
 
 def main():
     """Main function to run the automation script."""
@@ -275,6 +317,10 @@ def main():
 
     run_intel_command(domain, amass_dir)
     run_enum_amass(domain, amass_dir, scan_type)
+    run_nmap(domain, amass_dir, nmap_dir)
+    run_checkdmarc(domain, amass_dir, chekcdmarc_dir)
+    run_testssl(domain, amass_dir, testssl_dir)
+    print("Automation script completed successfully.")
 
 if __name__ == "__main__":
     try:
