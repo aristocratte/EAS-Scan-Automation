@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 import os
 import subprocess
 
-list_tools = ["amass", "nmap", "testssl", "httpx", "checkdmarc"]  
+list_tools = ["amass", "nmap", "testssl", "checkdmarc"]  
 
 def is_tool_installed(list_tools: str) -> bool:
     """Check if a tool is installed on the system."""
