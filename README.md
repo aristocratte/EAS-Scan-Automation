@@ -1,4 +1,4 @@
-# Automation Script - BOC Tools
+# Automation Script - Analyse EAS
 
 ## Description
 
@@ -9,7 +9,6 @@ Ce script automatise l'exécution de plusieurs outils de reconnaissance et d'ana
 - **Amass** : Reconnaissance de sous-domaines et cartographie de l'attack surface
 - **Nmap** : Scan de ports et découverte de services
 - **Testssl** : Analyse de la configuration SSL/TLS
-- **Httpx** : Vérification des services HTTP/HTTPS
 - **Checkdmarc** : Vérification des enregistrements DMARC
 
 ## Prérequis
@@ -44,7 +43,6 @@ output/
     │   └── [base de données amass pour visualisation]
     ├── nmap/
     ├── testssl/
-    ├── httpx/
     └── checkdmarc/
 ```
 
