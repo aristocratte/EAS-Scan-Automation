@@ -113,18 +113,79 @@ def amass_viz(db_dir: str) -> None:
             print(f"Stderr:\n{e.stderr}")
         # Gérer l'échec si nécessaire
 
-def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None: # Type de retour corrigé en None
-    """Run amass tool."""
-    amass_intel_command =[
-        "amass", "intel", "-d", domain, 
-    ] 
-    amass_command = [
-        "amass", "enum", "-d", domain, "-o", f"{amass_dir}/amass_output.txt", "-dir", amass_dir
+def run_intel_command(domain: str, amass_dir: str) -> None:
+    """Run amass intel command to gather intelligence on the domain."""
+    intel_command = [
+        "amass", "intel", "-d", domain, "-whois", "-o", f"{amass_dir}/intel_output.txt"
     ]
-    confirmation = input(f"Do you want to run amass for {domain}? (yes/no): ").strip().lower()
+    mode = input("Enter the mode for amass intel (passive/active): ").strip().lower()
+    confirmation = input(f"Do you want to run amass intel for {domain}? (yes/no): ").strip().lower()
+    
+    if mode == "active": # Insérer l'option après "intel"
+        intel_command.insert(2, "-active")
+    if confirmation == "yes":
+        print(f"[-] Running amass intel for {domain}...")
+        print(f"Amass intel command: {' '.join(intel_command)}")
+        try:
+            subprocess.run(intel_command, check=True, capture_output=True, text=True)  
+            print(f"Amass intel output saved to {amass_dir}/intel_output.txt")
+            print("Results are : ")
+            with open(f"{amass_dir}/intel_output.txt", "r") as file:
+                intel_output = file.read()
+                print(intel_output)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Amass intel command failed: {e}")
+            print(f"Error output (stderr): {e.stderr}")
+    else:
+        print(f"[-] Skipping amass intel for {domain}.")
+    
+
+
+
+
+
+def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None:
+    """Run amass tool."""
+    
+    original_domain = domain  # Sauvegarder le domaine original
+    use_file_list = False
+    
+    subdomain_list = input("Is your scan only a domain (1) or a list of subdomains from intel command (2) ? (1/2): ")
+    if subdomain_list == "2":
+        intel_file = os.path.join(amass_dir, "intel_output.txt")
+        if not os.path.isfile(intel_file):
+            print(f"intel_output.txt not found in {amass_dir}. Please run amass intel first.")
+            return
+        print(f"Using intel_output.txt from {amass_dir} for subdomains.")
+        use_file_list = True
+    
+    confirmation = input(f"Do you want to run amass for {original_domain}? (yes/no): ").strip().lower()
     nocolor = input("Do you want to run amass without color? (yes/no): ").strip().lower()
     config = input("Do you want to use a custom config file? (yes/no): ").strip().lower()
     
+    # Construire la commande amass
+    amass_command = ["amass", "enum"]
+    
+    # Ajouter le type de scan
+    if scan_type == "active":
+        amass_command.append("-active")
+    # Pour passive, on n'ajoute -passive
+    elif scan_type == "passive":
+        amass_command.append("-passive")
+    else:
+        print("Invalid scan type. Please enter 'passive' or 'active'.")
+        return
+    # Ajouter la source (domaine ou fichier)
+    if use_file_list:
+        amass_command.extend(["-df", os.path.join(amass_dir, "intel_output.txt")])
+    else:
+        amass_command.extend(["-d", original_domain])
+    
+    # Ajouter les options de sortie
+    amass_command.extend(["-o", f"{amass_dir}/amass_output.txt", "-dir", amass_dir])
+    
+    # Ajouter les options supplémentaires
     if config == "yes":
         config_file = input("Enter the absolute path to the config file config.yaml (by default ~/.config/amass/config.yaml): ").strip()
         if not os.path.isfile(config_file):
@@ -132,16 +193,11 @@ def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None: # Type 
             return
         amass_command.extend(["-config", config_file])
     
-    if scan_type == "active":
-        active_options = ["-active", "-ip", "-brute"]
-        insert_pos = amass_command.index("enum") + 1
-        for i, opt in enumerate(active_options):
-            amass_command.insert(insert_pos + i, opt)
     if nocolor == "yes":
-        amass_command.extend(["-nocolor"])
+        amass_command.append("-nocolor")
     
     if confirmation == "yes":
-        print(f"[-] Running amass for {domain}...")
+        print(f"[-] Running amass for {original_domain}...")
         print(f"Amass command: {' '.join(amass_command)}") # Pour le débogage
         try:
             result = subprocess.run(amass_command, check=True, capture_output=True, text=True)
@@ -154,6 +210,12 @@ def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None: # Type 
             print(f"Error output (stdout): {e.stdout}")
             print(f"Error output (stderr): {e.stderr}")
             return
+    elif confirmation == "no":
+        print(f"[-] Skipping amass for {original_domain}.")
+        return
+    else:
+        print("Invalid choice. Please enter 'yes' or 'no'.")
+        return
     
     viz_choice = input("Do you want to generate a visualization of the amass output? (yes/no): ").strip().lower()
     if viz_choice == "yes":
@@ -162,6 +224,30 @@ def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None: # Type 
         amass_viz(amass_dir)
         print("Visualization generation complete.")
     return
+
+def run_nmap(domain: str,  amass_dir: str, nmap_dir: str) -> None:
+    """Run nmap tool."""
+    original_domain = domain  # Sauvegarder le domaine original
+    use_file_list = False
+
+    subdomain_list = input("Is your scan only a domain (1) or a list of subdomains from intel command (2) ? (1/2): ")
+    if subdomain_list == "2":
+        live_hosts = os.path.join(amass_dir, "amass_output.txt")
+        if not os.path.isfile(live_hosts):
+            print(f"amass_output.txt not found in {amass_dir}. Please run amass first.")
+            return
+        print(f"Using amass_output.txt from {amass_dir} for nmap scan.")
+        use_file_list = True
+    elif subdomain_list == "1":
+        live_hosts = original_domain
+    else:
+        print("Invalid choice. Please enter '1' or '2'.")
+        return
+    
+    confirmation = input(f"Do you want to run nmap for {domain} ? (yes/no): ").strip().lower()
+    mode = input("Enter the mode for nmap (passive/active): ").strip().lower()
+    nmap_command =["nmap", ""] 
+
 
 
 
@@ -183,7 +269,11 @@ def main():
         return
     
     amass_dir = output_dirs["amass"]
+    nmap_dir = output_dirs["nmap"]
+    testssl_dir = output_dirs["testssl"]
+    chekcdmarc_dir = output_dirs["checkdmarc"]
 
+    run_intel_command(domain, amass_dir)
     run_enum_amass(domain, amass_dir, scan_type)
 
 if __name__ == "__main__":
