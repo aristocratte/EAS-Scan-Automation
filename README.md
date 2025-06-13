@@ -1,204 +1,204 @@
-# 🤖 Automation.py - Guide Complet
+# automation.py - Complete Guide
 
-## 📋 Vue d'ensemble
+## Overview
 
-`automation.py` est un script Python avancé qui automatise l'exécution de cinq outils de reconnaissance et d'analyse de sécurité. Il permet d'effectuer une analyse complète d'un domaine en utilisant une approche modulaire avec possibilité d'ignorer individuellement chaque étape.
+`automation.py` is an advanced Python script that automates the execution of five reconnaissance and security analysis tools. It enables a complete analysis of a domain using a modular approach, with the ability to skip each step individually.
 
-## 🎯 Fonctionnalités Principales
+## Main Features
 
-### ✨ Workflow Intelligent
+### Smart Workflow
 
-- **5 étapes configurables** : Chaque outil peut être exécuté ou ignoré individuellement
-- **Logique de continuation** : Si une étape échoue ou est ignorée, le script continue automatiquement
-- **Interface colorée** : Messages avec codes couleur pour une meilleure lisibilité
-- **Gestion d'erreurs robuste** : Protection contre les crashes et récupération automatique
+- **5 configurable steps**: Each tool can be executed or skipped individually
+- **Continuation logic**: If a step fails or is skipped, the script automatically continues
+- **Colored interface**: Messages with color codes for better readability
+- **Robust error handling**: Protection against crashes and automatic recovery
 
-### 🔧 Outils Intégrés
+### Integrated Tools
 
-1. **🔍 AMASS INTEL** - Collecte d'informations initiales
-2. **🌐 AMASS ENUM** - Énumération des sous-domaines
-3. **🔍 NMAP** - Scan des ports et services
-4. **📧 CheckDMARC** - Analyse des configurations email
-5. **🔒 TestSSL** - Audit SSL/TLS avec parallélisme avancé
+1. **AMASS INTEL** - Initial information gathering
+2. **AMASS ENUM** - Subdomain enumeration
+3. **NMAP** - Port and service scanning
+4. **CheckDMARC** - Email configuration analysis
+5. **TestSSL** - SSL/TLS audit with advanced parallelism
 
-### 🚀 Nouvelle Fonctionnalité : TestSSL Parallèle
+### New Feature: Parallel TestSSL
 
-Le script inclut maintenant un système de traitement parallèle pour TestSSL avec :
+The script now includes a parallel processing system for TestSSL with:
 
-- **Surveillance des ressources système** en temps réel
-- **Protection anti-crash** automatique
-- **Suggestions intelligentes** du nombre de processus optimal
-- **Monitoring continu** des performances pendant l'exécution
+- **Real-time system resource monitoring**
+- **Automatic crash protection**
+- **Smart suggestions** for the optimal number of processes
+- **Continuous performance monitoring** during execution
 
 ---
 
-## 📦 Prérequis
+## Prerequisites
 
-### Outils Système Requis
+### Required System Tools
 
 ```bash
-# Vérification automatique lors de l'exécution
-amass       # Reconnaissance de sous-domaines
-nmap        # Scan de ports et services
-testssl     # Audit SSL/TLS
-checkdmarc  # Analyse des configurations email
+# Automatically checked at runtime
+amass       # Subdomain reconnaissance
+nmap        # Port and service scanning
+testssl     # SSL/TLS audit
+checkdmarc  # Email configuration analysis
 ```
 
-### Dépendances Python
+### Python Dependencies
 
 ```bash
 pip3 install psutil concurrent.futures
 ```
 
-### Installation des Outils
+### Tool Installation
 
 ```bash
-# Utilisez le script d'installation fourni
+# Use the provided installation script
 python3 install-tools.py
 ```
 
 ---
 
-## 🚀 Utilisation
+## Usage
 
-### Lancement Basique
+### Basic Launch
 
 ```bash
 python3 automation.py
 ```
 
-### Workflow Interactif
+### Interactive Workflow
 
-1. **Choix du type de scan** : `passive` ou `active`
-2. **Saisie du domaine** : Format sans préfixe (ex: `example.com`)
-3. **Gestion des répertoires** : Création automatique ou choix d'action
-4. **Exécution des 5 étapes** : Confirmation individuelle pour chaque outil
+1. **Choose scan type**: `passive` or `active`
+2. **Enter the domain**: Format without prefix (e.g., `example.com`)
+3. **Directory management**: Automatic creation or action choice
+4. **Run the 5 steps**: Individual confirmation for each tool
 
 ---
 
-## 📊 Description Détaillée des Étapes
+## Detailed Step Description
 
-### 🔍 ÉTAPE 1/5: AMASS INTEL
+### STEP 1/5: AMASS INTEL
 
-**Collecte d'informations sur le domaine cible**
-
-```bash
-Objectif : Découvrir des domaines et organisations liés
-Options  : Mode passif ou actif
-Sortie   : intel_output.txt
-```
-
-**Fonctionnalités :**
-
-- Recherche WHOIS automatique
-- Découverte d'organisations liées
-- Mode actif pour recherches approfondies
-- Affichage des résultats en temps réel
-
-### 🌐 ÉTAPE 2/5: AMASS ENUM
-
-**Énumération complète des sous-domaines**
+**Gathering information about the target domain**
 
 ```bash
-Objectif : Découvrir tous les sous-domaines accessibles
-Source   : Domaine unique ou liste intel
-Sortie   : amass_output.txt + base de données graphique
+Goal   : Discover related domains and organizations
+Options: Passive or active mode
+Output : intel_output.txt
 ```
 
-**Options avancées :**
+**Features:**
 
-- Configuration personnalisée (config.yaml)
-- Mode sans couleur pour parsing
-- Génération de visualisations D3
-- Support des listes de domaines
+- Automatic WHOIS search
+- Discovery of related organizations
+- Active mode for in-depth searches
+- Real-time result display
 
-### 🔍 ÉTAPE 3/5: NMAP
+### STEP 2/5: AMASS ENUM
 
-**Scan des ports et détection de services**
+**Complete subdomain enumeration**
 
 ```bash
-Objectif : Identifier les services exposés
-Modes    : Passif (top 100 ports) / Actif (scan complet)
-Sortie   : Fichiers nmap (XML, nmap, gnmap)
+Goal   : Discover all accessible subdomains
+Source : Single domain or intel list
+Output : amass_output.txt + graph database
 ```
 
-**Protections intégrées :**
+**Advanced options:**
 
-- Avertissements pour le mode actif
-- Confirmation double pour scans intrusifs
-- Génération de visualisations HTML
-- Timeout et retry configurables
+- Custom configuration (config.yaml)
+- No-color mode for parsing
+- D3 visualizations generation
+- Domain list support
 
-### 📧 ÉTAPE 4/5: CheckDMARC
+### STEP 3/5: NMAP
 
-**Analyse complète des configurations email**
+**Port and service detection scan**
 
 ```bash
-Objectif : Vérifier SPF, DMARC, DKIM
-Support  : Domaine unique ou liste de sous-domaines
-Sortie   : Fichiers JSON individuels par domaine
+Goal   : Identify exposed services
+Modes  : Passive (top 100 ports) / Active (full scan)
+Output : nmap files (XML, nmap, gnmap)
 ```
 
-**Analyses effectuées :**
+**Built-in protections:**
 
-- Configuration SPF (Sender Policy Framework)
-- Politique DMARC (Domain-based Message Authentication)
-- Enregistrements DKIM (DomainKeys Identified Mail)
-- Validation des enregistrements DNS
+- Warnings for active mode
+- Double confirmation for intrusive scans
+- HTML visualization generation
+- Configurable timeout and retry
 
-### 🔒 ÉTAPE 5/5: TestSSL (NOUVEAU : Parallélisme Avancé)
+### STEP 4/5: CheckDMARC
 
-**Audit SSL/TLS avec traitement parallèle intelligent**
+**Complete email configuration analysis**
 
 ```bash
-Objectif : Analyser la sécurité SSL/TLS
-Support  : Traitement parallèle pour listes de domaines
-Sortie   : Fichiers JSON détaillés par domaine
+Goal   : Check SPF, DMARC, DKIM
+Support: Single domain or subdomain list
+Output : Individual JSON files per domain
 ```
 
-## 🚀 Nouvelles Fonctionnalités TestSSL
+**Analyses performed:**
 
-### 📊 Surveillance des Ressources Système
+- SPF (Sender Policy Framework) configuration
+- DMARC (Domain-based Message Authentication) policy
+- DKIM (DomainKeys Identified Mail) records
+- DNS record validation
 
-Le script surveille automatiquement :
+### STEP 5/5: TestSSL (NEW: Advanced Parallelism)
 
-- **Utilisation CPU** : Pourcentage en temps réel
-- **Mémoire disponible** : RAM libre en GB
-- **Load Average** : Charge système
-- **Nombre de cœurs** : Détection automatique
+**SSL/TLS audit with smart parallel processing**
 
-### 🛡️ Protection Anti-Crash
+```bash
+Goal   : Analyze SSL/TLS security
+Support: Parallel processing for domain lists
+Output : Detailed JSON files per domain
+```
 
-**Critères de protection :**
+## New TestSSL Features
+
+### System Resource Monitoring
+
+The script automatically monitors:
+
+- **CPU usage**: Real-time percentage
+- **Available memory**: Free RAM in GB
+- **Load average**: System load
+- **Number of cores**: Auto-detection
+
+### Crash Protection
+
+**Protection criteria:**
 
 ```python
-CPU > 80%           # Arrêt si surcharge processeur
-Mémoire > 85%       # Arrêt si RAM insuffisante
-RAM libre < 1GB     # Protection mémoire minimale
-Workers > CPU cores # Limitation intelligente
+CPU > 80%           # Stop if CPU overloaded
+Memory > 85%        # Stop if RAM is insufficient
+Free RAM < 1GB      # Minimum memory protection
+Workers > CPU cores # Smart limitation
 ```
 
-### 🎯 Suggestions Intelligentes
+### Smart Suggestions
 
-Le système calcule automatiquement :
+The system automatically calculates:
 
 ```python
-Max par CPU    = Cœurs - 1        # Garde 1 cœur libre
-Max par RAM    = RAM_GB / 2       # ~2GB par worker
-Suggestion     = min(CPU, RAM, 8) # Maximum 8 workers
+Max by CPU    = Cores - 1        # Keep at least 1 core free
+Max by RAM    = RAM_GB / 2       # ~2GB per worker
+Suggestion    = min(CPU, RAM, 8) # Maximum 8 workers
 ```
 
-### 🔄 Exécution Parallèle
+### Parallel Execution
 
-**Fonctionnalités avancées :**
+**Advanced features:**
 
-- **ThreadPoolExecutor** : Gestion professionnelle des threads
-- **Timeout de 5 minutes** par domaine
-- **Monitoring continu** des ressources pendant l'exécution
-- **Fallback séquentiel** en cas de surcharge
-- **Affichage du progrès** en temps réel
+- **ThreadPoolExecutor**: Professional thread management
+- **5-minute timeout** per domain
+- **Continuous resource monitoring** during execution
+- **Sequential fallback** in case of overload
+- **Real-time progress display**
 
-**Exemple d'exécution :**
+**Example run:**
 
 ```bash
 [?] How many parallel processes do you want? (Suggested: 3, Max safe: 3): 2
@@ -211,210 +211,210 @@ Suggestion     = min(CPU, RAM, 8) # Maximum 8 workers
 
 ---
 
-## 🎨 Codes Couleur du Terminal
+## Terminal Color Codes
 
-| Couleur  | Code          | Usage        | Exemple                           |
-| -------- | ------------- | ------------ | --------------------------------- |
-| 🟢 Vert  | `\033[92m[+]` | Succès       | `[+] Scan completed successfully` |
-| 🔴 Rouge | `\033[91m[!]` | Erreurs      | `[!] Command failed`              |
-| 🟡 Jaune | `\033[93m[?]` | Questions    | `[?] Do you want to continue?`    |
-| 🔵 Cyan  | `\033[96m[-]` | Informations | `[-] Running nmap scan...`        |
-| 🟦 Bleu  | `\033[94m[>]` | Progression  | `[>] Moving to next step...`      |
-| ⚫ Gris  | `\033[90m`    | Debug        | Commandes et détails techniques   |
+| Color  | Code          | Usage     | Example                           |
+| ------ | ------------- | --------- | --------------------------------- |
+| Green  | `\033[92m[+]` | Success   | `[+] Scan completed successfully` |
+| Red    | `\033[91m[!]` | Errors    | `[!] Command failed`              |
+| Yellow | `\033[93m[?]` | Questions | `[?] Do you want to continue?`    |
+| Cyan   | `\033[96m[-]` | Info      | `[-] Running nmap scan...`        |
+| Blue   | `\033[94m[>]` | Progress  | `[>] Moving to next step...`      |
+| Gray   | `\033[90m`    | Debug     | Commands and technical details    |
 
 ---
 
-## 📁 Structure des Outputs
+## Output Structure
 
 ```
 output/
-└── exemple.com/
+└── example.com/
     ├── amass/
     │   ├── intel_output.txt
     │   ├── amass_output.txt
-    │   └── [base de données graphique]
+    │   └── [graph database]
     ├── nmap/
     │   ├── nmap.nmap
     │   ├── nmap.xml
     │   ├── nmap.gnmap
-    │   └── nmap.html (optionnel)
+    │   └── nmap.html (optional)
     ├── checkdmarc/
-    │   ├── exemple.com.json
-    │   ├── subdomain1.exemple.com.json
-    │   └── subdomain2.exemple.com.json
+    │   ├── example.com.json
+    │   ├── subdomain1.example.com.json
+    │   └── subdomain2.example.com.json
     └── testssl/
-        ├── exemple.com.json
-        ├── subdomain1.exemple.com.json
-        └── subdomain2.exemple.com.json
+        ├── example.com.json
+        ├── subdomain1.example.com.json
+        └── subdomain2.example.com.json
 ```
 
 ---
 
-## ⚙️ Configuration Avancée
+## Advanced Configuration
 
-### Variables d'Environnement
+### Environment Variables
 
 ```bash
 export AMASS_CONFIG="/path/to/config.yaml"
 export NMAP_TIMING="T3"  # T1-T5
-export TESTSSL_TIMEOUT="300"  # Secondes
+export TESTSSL_TIMEOUT="300"  # Seconds
 ```
 
-### Optimisation des Performances
+### Performance Optimization
 
-**Pour TestSSL Parallèle :**
+**For Parallel TestSSL:**
 
-- **Systèmes performants** : 4-8 workers recommandés
-- **Systèmes limités** : 1-2 workers maximum
-- **Surveillance continue** : Le script ajuste automatiquement
+- **High-performance systems**: 4-8 workers recommended
+- **Limited systems**: 1-2 workers max
+- **Continuous monitoring**: The script auto-adjusts
 
-**Recommandations matériel :**
+**Hardware recommendations:**
 
-- **RAM minimum** : 4GB (8GB+ recommandé)
-- **CPU** : Multi-cœur recommandé pour parallélisme
-- **Stockage** : SSD pour performances optimales
+- **Minimum RAM**: 4GB (8GB+ recommended)
+- **CPU**: Multi-core recommended for parallelism
+- **Storage**: SSD for optimal performance
 
 ---
 
-## 🐛 Dépannage
+## Troubleshooting
 
-### Problèmes Courants
+### Common Issues
 
-**1. Outils manquants**
+**1. Missing tools**
 
 ```bash
 [!] amass is not installed.
 Solution: python3 install-tools.py
 ```
 
-**2. Permissions insuffisantes**
+**2. Insufficient permissions**
 
 ```bash
 [!] Permission denied
 Solution: chmod +x automation.py
 ```
 
-**3. Erreurs de mémoire TestSSL**
+**3. TestSSL memory errors**
 
 ```bash
 [!] High resource usage detected! CPU: 95.2%, Memory: 92.1%
-Action: Le script réduit automatiquement les workers
+Action: The script automatically reduces workers
 ```
 
-**4. Timeouts TestSSL**
+**4. TestSSL timeouts**
 
 ```bash
 [!] TestSSL timeout for subdomain.com
-Cause: Domaine inaccessible ou très lent
-Action: Continuez avec les autres domaines
+Cause: Domain unreachable or very slow
+Action: Continue with other domains
 ```
 
-### Logs et Debug
+### Logs and Debug
 
-**Mode verbose :**
+**Verbose mode:**
 
 ```python
-# Dans le code, activez les prints de debug
+# In the code, enable debug prints
 DEBUG = True
 ```
 
-**Surveillance ressources :**
+**Resource monitoring:**
 
 ```bash
-# Pendant l'exécution, surveillez dans un autre terminal
+# While running, monitor in another terminal
 htop
-# ou
+# or
 watch -n 1 'ps aux | grep testssl'
 ```
 
 ---
 
-## 🔄 Intégration avec d'autres Scripts
+## Integration with Other Scripts
 
-### Génération de Dashboard Excel
+### Excel Dashboard Generation
 
 ```bash
-# Après exécution d'automation.py
+# After running automation.py
 ./generate_excel_dashboard.sh
-# ou directement
-python3 excel_security_dashboard.py output/exemple.com/checkdmarc/
+# or directly
+python3 excel_security_dashboard.py output/example.com/checkdmarc/
 ```
 
-### Beautification Amass
+### Amass Beautification
 
 ```bash
-python3 amassbeautifier.py output/exemple.com/amass/amass_output.txt
+python3 amassbeautifier.py output/example.com/amass/amass_output.txt
 ```
 
-### Cartographie des Domaines
+### Domain Mapping
 
 ```bash
-python3 domain_mapper.py output/exemple.com/amass/amass_output.txt
+python3 domain_mapper.py output/example.com/amass/amass_output.txt
 ```
 
 ---
 
-## 📊 Métriques et Performance
+## Metrics and Performance
 
-### Benchmarks Typiques
+### Typical Benchmarks
 
-| Étape       | Domaine Unique | 10 Sous-domaines     | 50 Sous-domaines      |
-| ----------- | -------------- | -------------------- | --------------------- |
-| Amass Intel | 30-60s         | 1-2 min              | 2-5 min               |
-| Amass Enum  | 2-10 min       | 5-15 min             | 10-30 min             |
-| Nmap        | 1-5 min        | 5-20 min             | 20-60 min             |
-| CheckDMARC  | 10-30s         | 2-5 min              | 5-15 min              |
-| TestSSL     | 1-3 min        | 3-10 min (parallèle) | 10-25 min (parallèle) |
+| Step        | Single Domain | 10 Subdomains       | 50 Subdomains        |
+| ----------- | ------------- | ------------------- | -------------------- |
+| Amass Intel | 30-60s        | 1-2 min             | 2-5 min              |
+| Amass Enum  | 2-10 min      | 5-15 min            | 10-30 min            |
+| Nmap        | 1-5 min       | 5-20 min            | 20-60 min            |
+| CheckDMARC  | 10-30s        | 2-5 min             | 5-15 min             |
+| TestSSL     | 1-3 min       | 3-10 min (parallel) | 10-25 min (parallel) |
 
-### TestSSL Parallèle vs Séquentiel
+### Parallel vs Sequential TestSSL
 
-**Exemple avec 20 sous-domaines :**
+**Example with 20 subdomains:**
 
-- **Séquentiel** : ~60 minutes (3 min/domaine)
-- **Parallèle (4 workers)** : ~15 minutes (gain x4)
-- **Parallèle (8 workers)** : ~8 minutes (gain x7-8)
+- **Sequential**: ~60 minutes (3 min/domain)
+- **Parallel (4 workers)**: ~15 minutes (4x faster)
+- **Parallel (8 workers)**: ~8 minutes (7-8x faster)
 
 ---
 
-## 🔧 Développement et Contribution
+## Development and Contribution
 
-### Structure du Code
+### Code Structure
 
 ```python
-# Fonctions principales
-main()                    # Point d'entrée
-run_intel_command()       # Étape 1
-run_enum_amass()         # Étape 2
-run_nmap()               # Étape 3
-run_checkdmarc()         # Étape 4
-run_testssl()            # Étape 5 (avec parallélisme)
+# Main functions
+main()                    # Entry point
+run_intel_command()       # Step 1
+run_enum_amass()          # Step 2
+run_nmap()                # Step 3
+run_checkdmarc()          # Step 4
+run_testssl()             # Step 5 (with parallelism)
 
-# Fonctions utilitaires
-check_system_resources() # Surveillance système
-is_system_overloaded()   # Protection anti-crash
-suggest_max_workers()    # Suggestions intelligentes
-run_testssl_single()     # Exécution TestSSL unitaire
+# Utility functions
+check_system_resources()  # System monitoring
+is_system_overloaded()    # Crash protection
+suggest_max_workers()     # Smart suggestions
+run_testssl_single()      # Single TestSSL execution
 ```
 
-### Ajout de Nouveaux Outils
+### Adding New Tools
 
-1. **Ajouter à list_tools** : `["amass", "nmap", "testssl", "checkdmarc", "nouveau_outil"]`
-2. **Créer la fonction** : `run_nouveau_outil(domain, input_dir, output_dir)`
-3. **Ajouter dans main()** : Appel de la nouvelle fonction
-4. **Tester** : Vérification complète du workflow
+1. **Add to list_tools**: `["amass", "nmap", "testssl", "checkdmarc", "new_tool"]`
+2. **Create the function**: `run_new_tool(domain, input_dir, output_dir)`
+3. **Add in main()**: Call the new function
+4. **Test**: Full workflow verification
 
 ---
 
-## 📚 Ressources et Références
+## Resources and References
 
-### Documentation Officielle
+### Official Documentation
 
 - [Amass Documentation](https://github.com/OWASP/Amass)
 - [Nmap Reference Guide](https://nmap.org/book/)
 - [TestSSL.sh Documentation](https://testssl.sh/)
 - [CheckDMARC Documentation](https://domainaware.github.io/checkdmarc/)
 
-### Liens Utiles
+### Useful Links
 
 - [RFC 7208 - SPF](https://tools.ietf.org/html/rfc7208)
 - [RFC 7489 - DMARC](https://tools.ietf.org/html/rfc7489)
@@ -422,56 +422,56 @@ run_testssl_single()     # Exécution TestSSL unitaire
 
 ---
 
-## 📝 Changelog
+## Changelog
 
-### Version 3.0 (Actuelle)
+### Version 3.0 (Current)
 
-- ✨ **Ajout du parallélisme TestSSL** avec surveillance intelligente
-- 🛡️ **Protection anti-crash** automatique
-- 🎨 **Interface colorée** pour tous les messages
-- 🔄 **Logique de continuation** pour toutes les étapes
-- 📊 **Monitoring des ressources** en temps réel
+- Added TestSSL parallelism with smart monitoring
+- Automatic crash protection
+- Colored interface for all messages
+- Continuation logic for all steps
+- Real-time resource monitoring
 
 ### Version 2.0
 
-- 🌐 **Support des listes de domaines** pour tous les outils
-- 🎯 **Logique de continuation** pour ignorer les étapes
-- 📧 **Intégration CheckDMARC** complète
-- 🔍 **Améliorations Nmap** avec protections
+- Domain list support for all tools
+- Continuation logic to skip steps
+- Full CheckDMARC integration
+- Nmap improvements with protections
 
 ### Version 1.0
 
-- 🚀 **Version initiale** avec 5 outils intégrés
-- 📁 **Gestion automatique** des répertoires
-- ⚙️ **Configuration flexible** pour chaque outil
+- Initial version with 5 integrated tools
+- Automatic directory management
+- Flexible configuration for each tool
 
 ---
 
-## 📞 Support
+## Support
 
-Pour toute question ou problème :
+For any questions or issues:
 
-1. **Vérifiez** que tous les outils sont installés : `python3 install-tools.py`
-2. **Consultez** les logs d'erreur dans le terminal
-3. **Testez** avec un domaine simple avant les listes importantes
-4. **Surveillez** les ressources système pendant l'exécution
+1. **Check** that all tools are installed: `python3 install-tools.py`
+2. **Consult** error logs in the terminal
+3. **Test** with a simple domain before large lists
+4. **Monitor** system resources during execution
 
 ---
 
-## 🎉 Conclusion
+## Conclusion
 
-`automation.py` offre maintenant un workflow complet et robuste pour l'analyse de sécurité des domaines. Avec le nouveau système de parallélisme pour TestSSL, la surveillance intelligente des ressources et la protection anti-crash, vous disposez d'un outil professionnel capable de gérer des analyses à grande échelle tout en préservant la stabilité de votre système.
+`automation.py` now offers a complete and robust workflow for domain security analysis. With the new parallel TestSSL system, smart resource monitoring, and crash protection, you have a professional tool capable of handling large-scale analyses while preserving your system's stability.
 
-**Workflow recommandé :**
+**Recommended workflow:**
 
 ```bash
-1. python3 automation.py          # Analyse complète
-2. ./generate_excel_dashboard.sh  # Dashboard Excel
-3. python3 domain_mapper.py       # Cartographie (optionnel)
+1. python3 automation.py          # Complete analysis
+2. ./generate_excel_dashboard.sh  # Excel dashboard
+3. python3 domain_mapper.py       # Mapping (optional)
 ```
 
 ---
 
-_Dernière mise à jour : Juin 2025_
-↓
-Résultat final -> sous_domaines.txt + rapport nmap + testssl + checkdmarc
+_Last update: June 2025_
+
+Final result -> subdomains.txt + nmap report + testssl + checkdmarc
