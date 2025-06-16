@@ -459,6 +459,37 @@ def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
             return
     
     print("\033[92m    [+] CheckDMARC analysis completed successfully !\033[0m")
+    report = input("\033[93m[?] Do you want to generate a report for the checkdmarc results? (yes/no): \033[0m").strip().lower()
+    if report == "yes":
+        import glob
+        json_files = glob.glob(f"{checkdmarc_dir}/*.json")
+        
+        if json_files:
+            # Construire la commande avec tous les fichiers JSON trouvés
+            cmd = ["python3", "checkdmarc_enhanced.py"] + json_files + ["-excel"]
+            print(f"\033[90mRunning Excel generation: python3 checkdmarc_enhanced.py {len(json_files)} files -excel\033[0m")
+            
+            try:
+                # Exécuter la commande directement sans changer de répertoire
+                result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                print("\033[92m[+] CheckDMARC Excel report generated successfully.\033[0m")
+                print(f"\033[96m[-] Report should be in the same directory as the script\033[0m")
+                
+                # Optionnel : afficher la sortie du script
+                if result.stdout:
+                    print(f"\033[90m{result.stdout}\033[0m")
+                    
+            except subprocess.CalledProcessError as e:
+                print(f"\033[91m[!] Excel generation failed: {e}\033[0m")
+                if e.stderr:
+                    print(f"\033[91mError details: {e.stderr}\033[0m")
+                if e.stdout:
+                    print(f"\033[90mOutput: {e.stdout}\033[0m")
+        else:
+            print("\033[93m[!] No JSON files found in checkdmarc directory.\033[0m")
+    else:
+        print("\033[93m[-] Skipping report generation for checkdmarc results.\033[0m")
+    
 
 
 
