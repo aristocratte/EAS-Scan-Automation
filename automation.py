@@ -495,7 +495,7 @@ def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
 
 
 def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
-    """Run testssl tool."""
+    """Run testssl tool with progress tracking and existing file detection."""
     print("\n" + "="*60)
     print(f"\033[96m[-] STEP 5/5: TestSSL Analysis - {domain}\033[0m")
     print("="*60)
@@ -509,7 +509,6 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
         print(f"\033[93m[-] Skipping testssl for {domain}.\033[0m")
         print("\033[94m    [>] TestSSL scan completed (skipped by user)\033[0m")
         return
-
 
     subdomain_list = input("Is your scan only a domain (1) or a list of subdomains (2) ? (1/2): ")
     if subdomain_list == "2":
@@ -527,41 +526,218 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
         print("\033[94m    [>] TestSSL scan completed (invalid choice)\033[0m")
         return
     
-    
-    
-    # Construire la commande testssl
+    # Préparer la liste des cibles à scanner
+    targets_to_scan = []
     if use_file_list:
         with open(subdomain_file, "r") as f:
-            subdomains = [line.strip() for line in f if line.strip()]
-        
-        if not subdomains:
-            print("\033[91m[!] No subdomains found in the file. Please check the file content.\033[0m")
-            print("\033[94m    [>] TestSSL scan completed (no subdomains)\033[0m")
-            return
-        
-        print(f"\033[94m[-] Running testssl for {len(subdomains)} subdomains...\033[0m")
-        for sub in subdomains:
-            testssl_command = ["testssl", "--quiet", "--color","0", "--parallel", "--hints", "--wide", "--jsonfile", f"{testssl_dir}/{sub}.json", "--htmlfile", f"{testssl_dir}/{sub}.html", f"https://{sub}"]
-            print(f"\033[90mTestSSL command: {' '.join(testssl_command)}\033[0m")
-            try:
-                subprocess.run(testssl_command, check=True)
-                print(f"\033[92m[+] TestSSL output for {sub} saved to {testssl_dir}/{sub}.json\033[0m")
-            except subprocess.CalledProcessError as e:
-                print(f"\033[91m[!] TestSSL command failed for {sub}: {e}\033[0m")
-                continue
+            targets_to_scan = [line.strip() for line in f if line.strip()]
     else:
-        testssl_command = ["testssl", "--quiet", "--color","0", "--jsonfile", f"{testssl_dir}/{original_domain}.json", f"https://{original_domain}"]
-        print(f"\033[96m[-] Using domain {original_domain} for testssl scan.\033[0m")
-        print(f"\033[90mTestSSL command : {' '.join(testssl_command)}\033[0m")
-        try:
-            subprocess.run(testssl_command, check=True)
-            print(f"\033[92m[+] TestSSL output saved to {testssl_dir}/{original_domain}.json\033[0m")
-        except subprocess.CalledProcessError as e:
-            print(f"\033[91m[!] TestSSL command failed: {e}\033[0m")
-            print("\033[94m    [>] TestSSL scan completed (command error)\033[0m")
-            return
+        targets_to_scan = [original_domain]
     
-    print("\033[92m    [+] TestSSL analysis completed successfully !\033[0m")
+    if not targets_to_scan:
+        print("\033[91m[!] No targets found to scan.\033[0m")
+        print("\033[94m    [>] TestSSL scan completed (no targets)\033[0m")
+        return
+    
+    # Pré-scan : vérifier quels fichiers existent déjà
+    print(f"\033[94m[-] Pre-scanning for existing files in {testssl_dir}...\033[0m")
+    existing_files = {}
+    new_scans_needed = []
+    
+    for target in targets_to_scan:
+        safe_filename = target.replace(".", "_").replace(":", "_")
+        csv_file = os.path.join(testssl_dir, f"{safe_filename}.csv")
+        json_file = os.path.join(testssl_dir, f"{safe_filename}.json")
+        html_file = os.path.join(testssl_dir, f"{safe_filename}.html")
+        
+        files_exist = {
+            'csv': os.path.exists(csv_file),
+            'json': os.path.exists(json_file),
+            'html': os.path.exists(html_file)
+        }
+        
+        if any(files_exist.values()):
+            existing_files[target] = {
+                'safe_filename': safe_filename,
+                'files': files_exist,
+                'csv_path': csv_file,
+                'json_path': json_file,
+                'html_path': html_file
+            }
+        else:
+            new_scans_needed.append(target)
+    
+    # Afficher le résumé du pré-scan
+    print(f"\033[96m[INFO] Pre-scan results:\033[0m")
+    print(f"  📊 Total targets: {len(targets_to_scan)}")
+    print(f"  ✅ Existing scans: {len(existing_files)}")
+    print(f"  🆕 New scans needed: {len(new_scans_needed)}")
+    
+    # Gestion des fichiers existants
+    skip_existing = False
+    overwrite_existing = False
+    
+    if existing_files:
+        print(f"\n\033[93m[!] Found existing scan files for {len(existing_files)} targets:\033[0m")
+        for target, info in list(existing_files.items())[:5]:  # Afficher max 5 exemples
+            files_status = []
+            if info['files']['csv']: files_status.append('CSV')
+            if info['files']['json']: files_status.append('JSON')
+            if info['files']['html']: files_status.append('HTML')
+            print(f"    • {target} ({', '.join(files_status)})")
+        
+        if len(existing_files) > 5:
+            print(f"    ... and {len(existing_files) - 5} more")
+        
+        choice = input(f"\033[93m[?] What do you want to do with existing files?\033[0m\n"
+                      "  1. Overwrite all existing files\n"
+                      "  2. Skip existing files (scan only new targets)\n"
+                      "  3. Generate reports only (no scanning)\n"
+                      "  4. Cancel operation\n"
+                      "Enter your choice (1/2/3/4): ").strip()
+        
+        if choice == "1":
+            overwrite_existing = True
+            targets_to_scan = targets_to_scan  # Scanner tout
+            print("\033[96m[-] Will overwrite all existing files\033[0m")
+        elif choice == "2":
+            skip_existing = True
+            targets_to_scan = new_scans_needed  # Scanner seulement les nouveaux
+            print(f"\033[96m[-] Will skip existing files and scan {len(new_scans_needed)} new targets\033[0m")
+        elif choice == "3":
+            print("\033[96m[-] Skipping scanning phase, going directly to report generation\033[0m")
+            targets_to_scan = []  # Pas de scan
+        elif choice == "4":
+            print("\033[93m[-] Operation cancelled by user\033[0m")
+            return
+        else:
+            print("\033[91m[!] Invalid choice. Defaulting to skip existing files.\033[0m")
+            skip_existing = True
+            targets_to_scan = new_scans_needed
+    
+    # Phase de scan avec barre de progression
+    if targets_to_scan:
+        print(f"\n\033[94m[-] Starting TestSSL scan for {len(targets_to_scan)} targets...\033[0m")
+        
+        successful_scans = 0
+        failed_scans = 0
+        
+        for i, target in enumerate(targets_to_scan, 1):
+            # Barre de progression
+            progress = (i / len(targets_to_scan)) * 100
+            remaining = len(targets_to_scan) - i
+            
+            print(f"\033[94m[{i:3d}/{len(targets_to_scan):3d}] [{progress:5.1f}%] Scanning: {target}\033[0m", end="")
+            if remaining > 0:
+                print(f" \033[90m({remaining} remaining)\033[0m")
+            else:
+                print(" \033[90m(last target)\033[0m")
+            
+            # Nettoyer le nom de fichier
+            safe_filename = target.replace(".", "_").replace(":", "_")
+            
+            # Construire la commande testssl (silencieuse)
+            testssl_command = ["./testssl.sh/testssl.sh", "--quiet", "--color", "0", 
+                             "--csvfile", f"{testssl_dir}/{safe_filename}.csv",
+                             "--jsonfile", f"{testssl_dir}/{safe_filename}.json",
+                             "--htmlfile", f"{testssl_dir}/{safe_filename}.html",
+                             f"https://{target}"]
+            
+            try:
+                # Exécuter sans afficher la sortie (capture everything)
+                result = subprocess.run(testssl_command, 
+                                      check=True, 
+                                      capture_output=True, 
+                                      text=True,
+                                      timeout=300)  # 5 minutes timeout
+                
+                print(f"    \033[92m✅ Success\033[0m")
+                successful_scans += 1
+                
+            except subprocess.TimeoutExpired:
+                print(f"    \033[91m⏰ Timeout (5min)\033[0m")
+                failed_scans += 1
+                continue
+                
+            except subprocess.CalledProcessError as e:
+                print(f"    \033[91m❌ Failed (exit code: {e.returncode})\033[0m")
+                failed_scans += 1
+                continue
+                
+            except Exception as e:
+                print(f"    \033[91m💥 Error: {str(e)[:50]}...\033[0m")
+                failed_scans += 1
+                continue
+        
+        # Résumé du scan
+        print(f"\n\033[94m[SCAN SUMMARY]\033[0m")
+        print(f"  ✅ Successful scans: {successful_scans}")
+        print(f"  ❌ Failed scans: {failed_scans}")
+        print(f"  📊 Total processed: {len(targets_to_scan)}")
+        
+        if successful_scans > 0:
+            print("\033[92m    [+] TestSSL scanning completed successfully !\033[0m")
+        else:
+            print("\033[91m    [!] No successful scans completed\033[0m")
+    
+    else:
+        print("\033[96m[-] No scanning needed, proceeding to analysis...\033[0m")
+    analysis = input("\033[93m[?] Do you want to report the TestSSL results in Excel Format? (yes/no): \033[0m").strip().lower()
+    if analysis == "yes":
+        print("\033[94m[-] Analyzing TestSSL results...\033[0m")
+        csv_files_found = []
+        
+        # Chercher tous les fichiers CSV dans le répertoire
+        for files in os.listdir(testssl_dir):
+            if files.endswith(".csv"):
+                print(f"\033[90mFound CSV file: {files}\033[0m")
+                csv_files_found.append(os.path.join(testssl_dir, files))
+        
+        if not csv_files_found:
+            print("\033[91m[!] No CSV files found in the TestSSL directory. Please ensure testssl generated CSV files.\033[0m")
+            print("\033[94m    [>] TestSSL analysis completed (no CSV files)\033[0m")
+            return
+        
+        # Générer un rapport individuel pour chaque fichier CSV
+        for csv_file_path in csv_files_found:
+            filename = os.path.basename(csv_file_path)
+            output = filename.replace(".csv", ".xlsx")
+            output_path = os.path.join(testssl_dir, output)
+            print(f"\033[90mProcessing: {filename} -> {output}\033[0m")
+            
+            try:
+                subprocess.run(["python3", "testssl-analyzer.py", csv_file_path, "-o", output_path], 
+                             check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                print(f"\033[92m[+] TestSSL analysis saved to {output_path}\033[0m")
+            except subprocess.CalledProcessError as e:
+                print(f"\033[91m[!] TestSSL analysis command failed for {filename}: {e}\033[0m")
+                if e.stderr:
+                    print(f"\033[91mError output (stderr): {e.stderr}\033[0m")
+                continue
+        
+        # Proposer un rapport général
+        if len(csv_files_found) > 1:
+            group = input("\033[93m[?] Do you want to create a general report for all TestSSL results? (yes/no): \033[0m").strip().lower()
+            if group == "yes":
+                print("\033[94m[-] Generating general report for TestSSL results...\033[0m")
+                general_report_path = os.path.join(testssl_dir, "general_testssl_report.xlsx")
+                
+                try:
+                    # Passer tous les fichiers CSV individuellement
+                    cmd = ["python3", "testssl-analyzer.py"] + csv_files_found + ["-o", general_report_path]
+                    subprocess.run(cmd, check=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    print(f"\033[92m[+] General report saved to {general_report_path}\033[0m")
+                except subprocess.CalledProcessError as e:
+                    print(f"\033[91m[!] General report command failed: {e}\033[0m")
+                    if e.stderr:
+                        print(f"\033[91mError output (stderr): {e.stderr}\033[0m")
+        
+        print("\033[92m[+] TestSSL analysis completed successfully.\033[0m")
+    else:
+        print("\033[93m[-] Skipping TestSSL analysis.\033[0m")
+        print("\033[94m    [>] TestSSL scan completed (skipped by user)\033[0m")
+        
+        
 
 def main():
     """Main function to run the automation script."""
