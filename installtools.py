@@ -1207,6 +1207,16 @@ except ImportError as e:
     def print_info(self, message: str) -> None:
         """Print info message (instance method)."""
         print_info(message)
+    def remove_amass_apt(self) -> bool:
+        """Remove amass installed via apt."""
+        try:
+            print_info("Removing amass installed via apt...")
+            run_command(["sudo", "apt", "remove", "-y", "amass"], timeout=120)
+            print_success("amass removed successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to remove amass via apt: {e}")
+            return False
 
     def _install_amass_snap(self) -> bool:
         """Install amass via snap with automatic PATH configuration."""
