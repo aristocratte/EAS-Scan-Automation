@@ -637,7 +637,7 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
             safe_filename = target.replace(".", "_").replace(":", "_")
             
             # Construire la commande testssl (silencieuse)
-            testssl_command = ["./testssl.sh/testssl.sh", "--quiet", "--color", "0", 
+            testssl_command = ["testssl.sh", "--quiet", "--color", "0", 
                              "--csvfile", f"{testssl_dir}/{safe_filename}.csv",
                              "--jsonfile", f"{testssl_dir}/{safe_filename}.json",
                              "--htmlfile", f"{testssl_dir}/{safe_filename}.html",
