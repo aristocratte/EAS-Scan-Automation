@@ -1242,23 +1242,6 @@ except ImportError as e:
             logger.error(f"Snap amass installation failed: {e}")
             return False
     
-    def _install_amass_apt(self) -> bool:
-        """Install amass via apt (alternative method)."""
-        try:
-            print_info("Installing amass via apt (alternative method)")
-            
-            # Update package list
-            run_command(["sudo", "apt", "update"], timeout=120)
-            
-            # Install amass
-            run_command(["sudo", "apt", "install", "-y", "amass"], timeout=300)
-            
-            print_success("amass installed successfully via apt")
-            return True
-            
-        except Exception as e:
-            logger.error(f"APT amass installation failed: {e}")
-            return False
     
     def _install_snapd(self) -> bool:
         """Install snapd if not present."""
