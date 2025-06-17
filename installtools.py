@@ -447,14 +447,18 @@ class RobustInstaller:
     def _check_package_manager(self) -> bool:
         """Check for available package managers."""
         managers = ["apt", "yum", "dnf", "pacman", "zypper", "brew"]
-        for manager in managers:
+        for manager in managers:        
             if check_command_exists(manager):
                 logger.info(f"Found package manager: {manager}")
                 return True
         return False
     
     def _install_dev_tools(self) -> bool:
-        """Install essential development tools."""
+        """Install essential development tools with Kali Linux fixes."""
+        # First, try to fix Kali repositories if needed
+        if self._is_kali_linux():
+            self._fix_kali_repositories()
+        
         essential_tools = [
             ("curl", ["curl", "--version"]),
             ("wget", ["wget", "--version"]),
@@ -462,12 +466,151 @@ class RobustInstaller:
             ("build-essential", ["gcc", "--version"])
         ]
         
+        success_count = 0
         for tool, check_cmd in essential_tools:
-            if not self._install_system_package(tool):
+            # Check if already installed
+            if self._check_tool_installed(check_cmd):
+                print_success(f"{tool} is already available")
+                success_count += 1
+                continue
+                
+            # Try to install with multiple methods
+            if self._install_system_package_robust(tool):
+                success_count += 1
+            else:
                 logger.warning(f"Could not install {tool}")
         
         # At least curl or wget should be available
-        return check_command_exists("curl") or check_command_exists("wget")
+        has_download_tool = check_command_exists("curl") or check_command_exists("wget")
+        has_git = check_command_exists("git")
+        
+        return success_count >= 2 and has_download_tool  # At least 2 tools including download capability
+
+    def _is_kali_linux(self) -> bool:
+        """Check if the system is Kali Linux."""
+        return "kali" in self.system_info.get('distribution', '').lower()
+    
+    def _fix_kali_repositories(self) -> bool:
+        """Fix Kali Linux repository issues."""
+        try:
+            print_info("Fixing Kali Linux repository configuration...")
+            
+            # Backup original sources.list
+            sources_list = Path("/etc/apt/sources.list")
+            backup_path = Path("/etc/apt/sources.list.backup")
+            
+            if sources_list.exists() and not backup_path.exists():
+                run_command(["sudo", "cp", str(sources_list), str(backup_path)])
+                print_success("Backed up original sources.list")
+            
+            # Create new sources.list with working repositories
+            kali_sources = """# Kali Linux repositories
+deb http://http.kali.org/kali kali-rolling main non-free-firmware contrib non-free
+deb-src http://http.kali.org/kali kali-rolling main non-free-firmware contrib non-free
+
+# Alternative mirrors in case of issues
+# deb http://ftp.halifax.rwth-aachen.de/kali kali-rolling main non-free-firmware contrib non-free
+# deb http://mirror.kali.org/kali kali-rolling main non-free-firmware contrib non-free
+"""
+            
+            # Write new sources.list
+            with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                f.write(kali_sources)
+                temp_sources = f.name
+            
+            run_command(["sudo", "mv", temp_sources, str(sources_list)])
+            print_success("Updated sources.list with working repositories")
+            
+            # Update package lists with timeout and error handling
+            try:
+                print_info("Updating package lists...")
+                run_command(["sudo", "apt", "update"], timeout=120)
+                print_success("Package lists updated successfully")
+                return True
+            except Exception as e:
+                logger.warning(f"Initial apt update failed: {e}")
+                
+                # Try with alternative repositories
+                print_info("Trying with alternative Kali repositories...")
+                alt_sources = """# Alternative Kali Linux repositories
+deb http://mirror.kali.org/kali kali-rolling main non-free-firmware contrib non-free
+deb http://ftp.halifax.rwth-aachen.de/kali kali-rolling main non-free-firmware contrib non-free
+"""
+                with tempfile.NamedTemporaryFile(mode='w', delete=False) as f:
+                    f.write(alt_sources)
+                    temp_sources = f.name
+                
+                run_command(["sudo", "mv", temp_sources, str(sources_list)])
+                
+                try:
+                    run_command(["sudo", "apt", "update"], timeout=120)
+                    print_success("Alternative repositories working")
+                    return True
+                except Exception as e2:
+                    logger.error(f"Alternative repositories also failed: {e2}")
+                    # Restore backup if available
+                    if backup_path.exists():
+                        run_command(["sudo", "cp", str(backup_path), str(sources_list)])
+                        print_warning("Restored original sources.list")
+                    return False
+                    
+        except Exception as e:
+            logger.error(f"Failed to fix Kali repositories: {e}")
+            return False
+    
+    def _install_system_package_robust(self, package: str) -> bool:
+        """Install system package with robust error handling and multiple attempts."""
+        # Check if already installed first
+        if check_package_installed(package):
+            return True
+        
+        install_methods = [
+            # Standard installation
+            lambda: self._install_system_package(package),
+            # With --fix-missing
+            lambda: self._install_system_package_with_options(package, ["--fix-missing"]),
+            # With --no-install-recommends  
+            lambda: self._install_system_package_with_options(package, ["--no-install-recommends"]),
+            # Force update and install
+            lambda: self._force_update_and_install(package)
+        ]
+        
+        for i, method in enumerate(install_methods, 1):
+            try:
+                print_info(f"Attempting installation method {i} for {package}...")
+                if method():
+                    return True
+            except Exception as e:
+                logger.warning(f"Installation method {i} failed for {package}: {e}")
+                continue
+        
+        return False
+    
+    def _install_system_package_with_options(self, package: str, options: List[str]) -> bool:
+        """Install system package with specific apt options."""
+        try:
+            if check_command_exists("apt"):
+                cmd = ["sudo", "apt", "install", "-y"] + options + [package]
+                run_command(cmd, timeout=300)
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to install {package} with options {options}: {e}")
+        return False
+    
+    def _force_update_and_install(self, package: str) -> bool:
+        """Force apt update and install package."""
+        try:
+            if check_command_exists("apt"):
+                # Force update
+                run_command(["sudo", "apt", "update", "--fix-missing"], timeout=120)
+                # Clean cache
+                run_command(["sudo", "apt", "clean"], timeout=60)
+                # Install
+                run_command(["sudo", "apt", "install", "-y", package], timeout=300)
+                return True
+        except Exception as e:
+            logger.warning(f"Force install failed for {package}: {e}")
+        return False
     
     def _install_system_package(self, package: str) -> bool:
         """Install a system package using the available package manager."""
@@ -679,19 +822,15 @@ except ImportError as e:
     def install_security_tools(self) -> bool:
         """Install all security tools with comprehensive fallback methods."""
         print_banner("INSTALLING SECURITY TOOLS")
-        
         tools_config = [
             {
                 'name': 'amass',
                 'description': 'OWASP Amass subdomain enumeration tool',
                 'check_cmd': ['amass', 'version'],
                 'install_methods': [
-                    self._install_amass_snap
+                    self._install_amass_snap_only
                 ],
-                'alternative_methods': [
-                    self._install_amass_apt,
-                    ['go', 'install', '-v', 'github.com/OWASP/Amass/v3/...@master']
-                ]
+                'alternative_methods': []
             },
             {
                 'name': 'httpx',
@@ -715,15 +854,16 @@ except ImportError as e:
                     ['sudo', 'yum', 'install', '-y', 'nmap'],
                     ['sudo', 'pacman', '-S', 'nmap']
                 ]
-            },
-            {
+            },            {
                 'name': 'testssl.sh',
                 'description': 'SSL/TLS testing tool',
                 'check_cmd': ['testssl.sh', '--version'],
                 'install_methods': [
                     self._install_testssl
                 ],
-                'alternative_methods': []
+                'alternative_methods': [
+                    self._install_testssl_alternative_location
+                ]
             }
         ]
         
@@ -801,32 +941,113 @@ except ImportError as e:
         except Exception as e:
             logger.error(f"Manual httpx installation failed: {e}")
             return False
+        def _install_testssl(self) -> bool:
+            """Install testssl.sh with robust GitHub cloning and proper PATH setup."""
+            try:
+                print_info("Installing testssl.sh from GitHub...")
+
+                testssl_dir = Path("/opt/testssl.sh")
+
+                # Remove existing installation if present
+                if testssl_dir.exists():
+                    print_info("Removing existing testssl.sh installation...")
+                    run_command(["sudo", "rm", "-rf", str(testssl_dir)])
+
+                # Ensure /opt directory exists
+                run_command(["sudo", "mkdir", "-p", "/opt"])
+
+                # Method 1: Try with git clone
+                try:
+                    print_info("Cloning testssl.sh repository...")
+                    run_command([
+                        "sudo", "git", "clone", 
+                        "https://github.com/drwetter/testssl.sh.git", 
+                        str(testssl_dir)
+                    ], timeout=300)
+                    print_success("testssl.sh repository cloned successfully")
+                except Exception as e:
+                    logger.warning(f"Git clone failed: {e}")
+
+                    # Method 2: Download and extract manually
+                    print_info("Trying manual download of testssl.sh...")
+                    if not self._download_testssl_manually(testssl_dir):
+                        return False
+
+                # Make testssl.sh executable
+                testssl_script = testssl_dir / "testssl.sh"
+                if not testssl_script.exists():
+                    print_error(f"testssl.sh script not found at {testssl_script}")
+                    return False
+
+                run_command(["sudo", "chmod", "+x", str(testssl_script)])
+                print_success("testssl.sh made executable")
+
+                # Create symlink in /usr/local/bin for easy access
+                symlink_path = Path("/usr/local/bin/testssl.sh")
+                try:
+                    if symlink_path.exists() or symlink_path.is_symlink():
+                        run_command(["sudo", "rm", str(symlink_path)])
+
+                    run_command(["sudo", "ln", "-s", "-f", str(testssl_script), str(symlink_path)])
+                    print_success("Created symlink in /usr/local/bin")
+                except Exception as e:
+                    logger.warning(f"Could not create symlink: {e}")
+                    print_warning("testssl.sh installed but not added to PATH")
+                    print_info(f"You can run it directly with: {testssl_script}")
+
+                # Verify installation
+                try:
+                    result = run_command([str(testssl_script), "--version"], timeout=10)
+                    print_success("testssl.sh installation verified")
+                    return True
+                except Exception as e:
+                    # Try via symlink
+                    try:
+                        run_command(["testssl.sh", "--version"], timeout=10)
+                        print_success("testssl.sh installation verified via symlink")
+                        return True
+                    except Exception:
+                        print_warning("testssl.sh installed but version check failed")
+                        return True  # Consider it successful if files are in place
+
+            except Exception as e:
+                logger.error(f"testssl.sh installation failed: {e}")
+                return False
     
-    def _install_testssl(self) -> bool:
-        """Install testssl.sh manually."""
+    def _download_testssl_manually(self, testssl_dir: Path) -> bool:
+        """Download testssl.sh manually without git."""
         try:
-            testssl_dir = Path("/opt/testssl.sh")
-            
-            # Remove existing installation
-            if testssl_dir.exists():
-                run_command(["sudo", "rm", "-rf", str(testssl_dir)])
-            
-            # Clone repository
-            run_command(["sudo", "git", "clone", "https://github.com/drwetter/testssl.sh.git", str(testssl_dir)])
-            
-            # Make executable
-            run_command(["sudo", "chmod", "+x", str(testssl_dir / "testssl.sh")])
-            
-            # Create symlink
-            symlink_path = Path("/usr/local/bin/testssl.sh")
-            if symlink_path.exists():
-                run_command(["sudo", "rm", str(symlink_path)])
-            
-            run_command(["sudo", "ln", "-s", str(testssl_dir / "testssl.sh"), str(symlink_path)])
-            
-            return True
+            with tempfile.TemporaryDirectory() as temp_dir:
+                archive_url = "https://github.com/drwetter/testssl.sh/archive/3.0.8.tar.gz"
+                archive_path = Path(temp_dir) / "testssl.tar.gz"
+                
+                # Download archive
+                if check_command_exists("curl"):
+                    run_command(["curl", "-L", "-o", str(archive_path), archive_url], timeout=300)
+                elif check_command_exists("wget"):
+                    run_command(["wget", "-O", str(archive_path), archive_url], timeout=300)
+                else:
+                    print_error("No download tool available (curl or wget)")
+                    return False
+                
+                # Extract archive
+                run_command(["tar", "-xzf", str(archive_path)], cwd=temp_dir)
+                
+                # Find extracted directory
+                extracted_dirs = [d for d in Path(temp_dir).iterdir() if d.is_dir() and "testssl" in d.name]
+                if not extracted_dirs:
+                    print_error("Could not find extracted testssl directory")
+                    return False
+                
+                extracted_dir = extracted_dirs[0]
+                
+                # Move to final location
+                run_command(["sudo", "mv", str(extracted_dir), str(testssl_dir)])
+                print_success("testssl.sh downloaded and extracted manually")
+                return True
+                
         except Exception as e:
-            logger.error(f"testssl.sh installation failed: {e}")
+            logger.error(f"Manual testssl download failed: {e}")
             return False
     
     def install_python_tools(self) -> bool:
@@ -1253,6 +1474,74 @@ except ImportError as e:
             return False
     
     
+    def _install_amass_snap_only(self) -> bool:
+        """Remove amass from apt and install ONLY via snap - no alternatives."""
+        try:
+            print_info("Installing amass via snap ONLY (removing apt version first)")
+            
+            # Step 1: Remove any existing amass installation via apt
+            print_info("Step 1: Removing any existing amass from apt...")
+            try:
+                # Check if amass is installed via apt
+                result = run_command(["dpkg", "-l", "amass"], capture_output=True, check=False)
+                if result.returncode == 0:
+                    print_info("Found amass installed via apt, removing it...")
+                    run_command(["sudo", "apt", "remove", "-y", "amass"], timeout=120)
+                    run_command(["sudo", "apt", "autoremove", "-y"], timeout=120)
+                    print_success("amass removed from apt")
+                else:
+                    print_info("No apt version of amass found")
+            except Exception as e:
+                print_warning(f"Could not check/remove apt amass: {e}")
+            
+            # Step 2: Check if snap is available, install if needed
+            print_info("Step 2: Ensuring snap is available...")
+            if not check_command_exists("snap"):
+                print_info("Snap not found, installing snapd...")
+                if not self._install_snapd():
+                    print_error("Failed to install snapd - cannot install amass")
+                    return False
+                    
+                # Wait a moment for snapd to start
+                print_info("Waiting for snapd to initialize...")
+                time.sleep(5)
+            
+            # Step 3: Install amass via snap ONLY
+            print_info("Step 3: Installing amass via snap...")
+            try:
+                run_command(["sudo", "snap", "install", "amass"], timeout=300)
+                print_success("amass installed via snap")
+            except Exception as e:
+                print_error(f"Failed to install amass via snap: {e}")
+                return False
+            
+            # Step 4: Configure PATH for snap binaries
+            print_info("Step 4: Configuring PATH for snap binaries...")
+            if not self._add_snap_to_path():
+                print_warning("Failed to add /snap/bin to PATH automatically")
+                print_warning("Please add 'export PATH=\"/snap/bin:$PATH\"' to your shell profile")
+            
+            # Step 5: Verify installation
+            print_info("Step 5: Verifying amass installation...")
+            snap_amass_path = "/snap/bin/amass"
+            if Path(snap_amass_path).exists():
+                try:
+                    # Test amass command
+                    run_command([snap_amass_path, "version"], timeout=10)
+                    print_success("amass installation verified - snap version working")
+                    return True
+                except Exception as e:
+                    print_warning(f"amass installed but version check failed: {e}")
+                    return True  # Consider successful if binary exists
+            else:
+                print_error("amass binary not found after snap installation")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Snap-only amass installation failed: {e}")
+            print_error(f"Failed to install amass via snap: {e}")
+            return False
+
     def _install_snapd(self) -> bool:
         """Install snapd if not present."""
         try:
@@ -1333,6 +1622,163 @@ except ImportError as e:
             
         except Exception as e:
             logger.error(f"Failed to add snap to PATH: {e}")
+            return False
+    def _install_amass_go(self) -> bool:
+        """Install amass using Go (if available)."""
+        try:
+            if not check_command_exists("go"):
+                print_info("Go not available for amass installation")
+                return False
+            
+            print_info("Installing amass via Go...")
+            run_command([
+                "go", "install", "-v", 
+                "github.com/owasp-amass/amass/v4/...@master"
+            ], timeout=600)
+            
+            # Check if installed in GOPATH/bin
+            go_bin_path = Path.home() / "go" / "bin" / "amass"
+            if go_bin_path.exists():
+                # Create symlink in /usr/local/bin
+                try:
+                    run_command(["sudo", "ln", "-sf", str(go_bin_path), "/usr/local/bin/amass"])
+                    print_success("amass installed via Go and linked to PATH")
+                    return True
+                except Exception:
+                    print_success("amass installed via Go (available in ~/go/bin/}")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Go amass installation failed: {e}")
+            return False
+    
+    def _install_amass_manual(self) -> bool:
+        """Install amass manually from GitHub releases."""
+        try:
+            print_info("Installing amass manually from GitHub releases...")
+            
+            # Determine architecture
+            arch = platform.machine().lower()
+            if arch == "x86_64":
+                arch = "amd64"
+            elif arch in ["aarch64", "arm64"]:
+                arch = "arm64"
+            else:
+                print_warning(f"Unsupported architecture for manual amass install: {arch}")
+                return False
+            
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # Download latest release
+                release_url = f"https://github.com/owasp-amass/amass/releases/download/v4.2.0/amass_Linux_{arch}.zip"
+                zip_path = Path(temp_dir) / "amass.zip"
+                
+                if check_command_exists("curl"):
+                    run_command(["curl", "-L", "-o", str(zip_path), release_url], timeout=300)
+                elif check_command_exists("wget"):
+                    run_command(["wget", "-O", str(zip_path), release_url], timeout=300)
+                else:
+                    print_error("No download tool available")
+                    return False
+                
+                # Extract
+                run_command(["unzip", str(zip_path)], cwd=temp_dir)
+                
+                # Find amass binary
+                amass_files = list(Path(temp_dir).rglob("amass"))
+                if not amass_files:
+                    print_error("amass binary not found in downloaded archive")
+                    return False
+                
+                amass_binary = amass_files[0]
+                
+                # Install to /usr/local/bin
+                run_command(["sudo", "cp", str(amass_binary), "/usr/local/bin/amass"])
+                run_command(["sudo", "chmod", "+x", "/usr/local/bin/amass"])
+                
+                print_success("amass installed manually")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Manual amass installation failed: {e}")
+            return False
+    
+    def _install_amass_apt_after_fix(self) -> bool:
+        """Try installing amass via apt after repository fixes."""
+        try:
+            if not check_command_exists("apt"):
+                return False
+            
+            print_info("Trying amass installation via apt after repository fixes...")
+            
+            # First try to update repositories again
+            try:
+                run_command(["sudo", "apt", "update"], timeout=120)
+            except Exception:
+                pass  # Continue even if update fails
+            
+            # Try installing with different options
+            install_commands = [
+                ["sudo", "apt", "install", "-y", "amass"],
+                ["sudo", "apt", "install", "-y", "--fix-missing", "amass"],
+                ["sudo", "apt", "install", "-y", "--no-install-recommends", "amass"]
+            ]
+            
+            for cmd in install_commands:
+                try:
+                    run_command(cmd, timeout=300)
+                    if check_command_exists("amass"):
+                        print_success("amass installed via apt")
+                        return True
+                except Exception as e:
+                    logger.warning(f"apt command failed: {e}")
+                    continue
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"apt amass installation failed: {e}")
+            return False
+    def _install_testssl_alternative_location(self) -> bool:
+        """Install testssl.sh in user's home directory as alternative."""
+        try:
+            print_info("Installing testssl.sh in user home directory...")
+            
+            testssl_dir = Path.home() / ".local" / "testssl.sh"
+            
+            # Remove existing installation
+            if testssl_dir.exists():
+                shutil.rmtree(testssl_dir)
+            
+            # Create directory
+            testssl_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Download and extract
+            if self._download_testssl_manually(testssl_dir):
+                # Make executable
+                testssl_script = testssl_dir / "testssl.sh"
+                if testssl_script.exists():
+                    os.chmod(testssl_script, 0o755)
+                    
+                    # Add to user's local bin
+                    local_bin = Path.home() / ".local" / "bin"
+                    local_bin.mkdir(parents=True, exist_ok=True)
+                    
+                    symlink_path = local_bin / "testssl.sh"
+                    if symlink_path.exists():
+                        symlink_path.unlink()
+                    
+                    symlink_path.symlink_to(testssl_script)
+                    
+                    print_success("testssl.sh installed in ~/.local/")
+                    print_info("Make sure ~/.local/bin is in your PATH")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Alternative testssl installation failed: {e}")
             return False
 
 # =============================================================================
