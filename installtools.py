@@ -771,30 +771,32 @@ except ImportError as e:
     def _install_testssl(self) -> bool:
         """Install testssl.sh manually."""
         try:
-            testssl_dir = Path("/opt/testssl.sh")
+            # Define installation directory
+            testssl_install_dir = Path("/opt/testssl.sh")
             
-            # Remove existing installation
-            if testssl_dir.exists():
-                run_command(["sudo", "rm", "-rf", str(testssl_dir)])
+            # Remove existing installation if it exists
+            if testssl_install_dir.exists():
+                run_command(["sudo", "rm", "-rf", str(testssl_install_dir)], timeout=60)
             
-            # Clone repository
-            run_command(["sudo", "git", "clone", "https://github.com/testssl/testssl.sh.git", str(testssl_dir)])
+            # Clone the repository to /opt/testssl.sh
+            repo_url = "https://github.com/testssl/testssl.sh.git"
+            run_command(["sudo", "git", "clone", repo_url, str(testssl_install_dir)], timeout=600)
             
-            # Make executable
-            run_command(["sudo", "chmod", "+x", str(testssl_dir / "testssl.sh")])
+            # Make the script executable
+            testssl_script = testssl_install_dir / "testssl.sh"
+            run_command(["sudo", "chmod", "+x", str(testssl_script)], timeout=30)
             
-            # Create symlink
-            symlink_path = Path("/usr/local/bin/testssl.sh")
-            if symlink_path.exists():
-                run_command(["sudo", "rm", str(symlink_path)])
-            
-            run_command(["sudo", "ln", "-s", str(testssl_dir / "testssl.sh"), str(symlink_path)])
+            # Create symbolic link to the testssl.sh script
+            testssl_path = Path("/usr/local/bin/testssl.sh")
+            if testssl_path.exists():
+                run_command(["sudo", "rm", str(testssl_path)])
+            run_command(["sudo", "ln", "-s", str(testssl_script), str(testssl_path)])
             
             return True
         except Exception as e:
             logger.error(f"testssl.sh installation failed: {e}")
             return False
-    
+
     def install_python_tools(self) -> bool:
         """Install Python-based security tools with virtual environments."""
         print_banner("INSTALLING PYTHON SECURITY TOOLS")
