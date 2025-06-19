@@ -689,17 +689,7 @@ except ImportError as e:
                     self._install_amass_snap
                 ]
             },
-            {
-                'name': 'httpx',
-                'description': 'ProjectDiscovery httpx HTTP toolkit',
-                'check_cmd': ['httpx', '-version'],
-                'install_methods': [
-                    ['go', 'install', '-v', 'github.com/projectdiscovery/httpx/cmd/httpx@latest']
-                ],
-                'alternative_methods': [
-                    self._install_httpx_manual
-                ]
-            },
+
             {
                 'name': 'nmap',
                 'description': 'Network Mapper',
@@ -777,26 +767,6 @@ except ImportError as e:
                 continue
         return False
     
-    def _install_httpx_manual(self) -> bool:
-        """Manual installation of httpx."""
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Clone repository
-                run_command(["git", "clone", "https://github.com/projectdiscovery/httpx.git"], cwd=temp_dir)
-                
-                # Build httpx
-                httpx_dir = Path(temp_dir) / "httpx" / "cmd" / "httpx"
-                run_command(["go", "build"], cwd=str(httpx_dir))
-                
-                # Move to /usr/local/bin
-                httpx_binary = httpx_dir / "httpx"
-                run_command(["sudo", "mv", str(httpx_binary), "/usr/local/bin/"])
-                run_command(["sudo", "chmod", "+x", "/usr/local/bin/httpx"])
-                
-                return True
-        except Exception as e:
-            logger.error(f"Manual httpx installation failed: {e}")
-            return False
     
     def _install_testssl(self) -> bool:
         """Install testssl.sh manually."""
@@ -808,7 +778,7 @@ except ImportError as e:
                 run_command(["sudo", "rm", "-rf", str(testssl_dir)])
             
             # Clone repository
-            run_command(["sudo", "git", "clone", "https://github.com/drwetter/testssl.sh.git", str(testssl_dir)])
+            run_command(["sudo", "git", "clone", "https://github.com/testssl/testssl.sh.git", str(testssl_dir)])
             
             # Make executable
             run_command(["sudo", "chmod", "+x", str(testssl_dir / "testssl.sh")])
@@ -973,7 +943,7 @@ except ImportError as e:
     
     def _verify_security_tools(self) -> bool:
         """Verify security tools installation."""
-        tools = ['amass', 'httpx', 'nmap', 'testssl.sh']
+        tools = ['amass', 'nmap', 'testssl.sh']
         verified = 0
         
         for tool in tools:
@@ -1111,7 +1081,7 @@ except ImportError as e:
             print("\n🎉 You can now use:")
             print("  • python3 automation.py - for comprehensive security scanning")
             print("  • python3 checkdmarc_enhanced.py -excel - for Excel reports")
-            print("  • All security tools: amass, httpx, nmap, testssl.sh")
+            print("  • All security tools: amass, nmap, testssl.sh")
             print("  • Python tools: checkdmarc, dnstwist")
             
             print("\n📋 Next steps:")
