@@ -8,7 +8,7 @@ import concurrent.futures
 import psutil
 import time
 
-list_tools = ["amass", "nmap", "testssl", "checkdmarc"]  
+list_tools = ["amass", "nmap", "testssl", "checkdmarc", "subfinder"]  
 
 def check_system_resources() -> Dict[str, float]:
     """Check current system resources usage."""
@@ -27,7 +27,7 @@ def is_system_overloaded(resources: Dict[str, float], max_workers: int) -> bool:
     """Check if system would be overloaded with given number of workers."""
     cpu_cores = psutil.cpu_count()
     
-    # Critères de surcharge
+
     if resources["cpu_percent"] > 80:
         return True
     if resources["memory_percent"] > 85:
@@ -127,12 +127,14 @@ def creating_tool_directories(domain: str) -> Dict[str, str]:
         return None
     
     amass_dir = f"{base_dir}/amass"
+    subfinder_dir = f"{base_dir}/subfinder"
     nmap_dir = f"{base_dir}/nmap"
     testssl_dir = f"{base_dir}/testssl"
     checkdmarc_dir = f"{base_dir}/checkdmarc"
     
     # Create tool directories
     os.makedirs(amass_dir, exist_ok=True)
+    os.makedirs(subfinder_dir, exist_ok=True)
     os.makedirs(nmap_dir, exist_ok=True)
     os.makedirs(testssl_dir, exist_ok=True)
     os.makedirs(checkdmarc_dir, exist_ok=True)
@@ -140,6 +142,7 @@ def creating_tool_directories(domain: str) -> Dict[str, str]:
     print("\033[92m[+] Tool directories created.\033[0m")
     return {
         "amass": amass_dir,
+        "subfinder": subfinder_dir,
         "nmap": nmap_dir,
         "testssl": testssl_dir,
         "checkdmarc": checkdmarc_dir
@@ -158,6 +161,170 @@ def user_choices_input() -> Dict[str, Any]:
         raise ValueError("Domain cannot be empty.")
     
     return {"scan_type": scan_type, "domain": domain}
+
+def run_intel_command(domain: str, amass_dir: str) -> None:
+    """Run intelligence gathering using WHOIS and ViewDNS.info to find related domains."""
+    print("\n" + "="*60)
+    print("\033[96m[-] STEP 1/5: INTELLIGENCE GATHERING - Domain investigation\033[0m")
+    print("="*60)
+    
+    confirmation = input(f"\033[93m[?] Do you want to run intelligence gathering for {domain}? (yes/no): \033[0m").strip().lower()
+    
+    if confirmation != "yes":
+        print(f"\033[93m[-] Skipping intelligence gathering for {domain}.\033[0m")
+        print("\033[94m    [>] Moving to next step...\033[0m")
+        return
+    
+    intel_output_file = f"{amass_dir}/intel_output.txt"
+    domains_found = set()
+    
+    # Étape 1: Requête WHOIS pour récupérer l'organisation
+    print(f"\033[94m[-] Step 1: Running WHOIS lookup for {domain}...\033[0m")
+    
+    try:
+        whois_command = ["whois", domain]
+        whois_result = subprocess.run(whois_command, check=True, capture_output=True, text=True, timeout=30)
+        
+        # Rechercher l'organisation dans la sortie WHOIS
+        organization = None
+        whois_output = whois_result.stdout.lower()
+        
+        # Différents patterns pour trouver l'organisation
+        org_patterns = [
+            r'organization:\s*(.+)',
+            r'org:\s*(.+)',
+            r'registrant organization:\s*(.+)',
+            r'registrant:\s*(.+)',
+            r'owner-organization:\s*(.+)'
+        ]
+        
+        import re
+        for pattern in org_patterns:
+            match = re.search(pattern, whois_output, re.IGNORECASE)
+            if match:
+                organization = match.group(1).strip()
+                if organization and organization.lower() not in ['n/a', 'not available', 'redacted', 'data redacted']:
+                    break
+        
+        if organization:
+            print(f"\033[92m[+] Organization found: {organization}\033[0m")
+        else:
+            print(f"\033[91m[!] Could not extract organization from WHOIS data\033[0m")
+            organization = input("\033[93m[?] Please enter the organization name manually (or press Enter to skip ViewDNS lookup): \033[0m").strip()
+            
+    except subprocess.CalledProcessError as e:
+        print(f"\033[91m[!] WHOIS command failed: {e}\033[0m")
+        organization = input("\033[93m[?] Please enter the organization name manually (or press Enter to skip ViewDNS lookup): \033[0m").strip()
+    except subprocess.TimeoutExpired:
+        print(f"\033[91m[!] WHOIS lookup timed out\033[0m")
+        organization = input("\033[93m[?] Please enter the organization name manually (or press Enter to skip ViewDNS lookup): \033[0m").strip()
+    
+    # Ajouter le domaine original à la liste
+    domains_found.add(domain)
+    
+    # Étape 2: Requête ViewDNS.info si on a une organisation
+    if organization:
+        print(f"\033[94m[-] Step 2: Searching ViewDNS.info for domains registered by '{organization}'...\033[0m")
+        
+        try:
+            import urllib.parse
+            import urllib.request
+            import json
+            
+            # Encoder l'organisation pour l'URL
+            encoded_org = urllib.parse.quote_plus(organization)
+            viewdns_url = f"https://viewdns.info/reversewhois/?q={encoded_org}"
+            
+            # Utiliser curl pour récupérer la page (plus fiable que urllib dans certains cas)
+            curl_command = ["curl", "-s", "-A", "Mozilla/5.0 (Linux; X11)", viewdns_url]
+            curl_result = subprocess.run(curl_command, check=True, capture_output=True, text=True, timeout=30)
+            
+            # Parser la réponse HTML pour extraire les domaines
+            html_content = curl_result.stdout
+            
+            # Rechercher les domaines dans le HTML
+            import re
+            # Pattern pour trouver les domaines dans les résultats ViewDNS
+            domain_pattern = r'<td[^>]*>([a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.(?:[a-zA-Z]{2,}))</td>'
+            found_domains = re.findall(domain_pattern, html_content)
+            
+            if found_domains:
+                print(f"\033[92m[+] Found {len(found_domains)} domains registered by '{organization}'\033[0m")
+                domains_found.update(found_domains)
+                
+                # Afficher quelques exemples
+                for i, found_domain in enumerate(found_domains[:5]):
+                    print(f"\033[90m    • {found_domain}\033[0m")
+                if len(found_domains) > 5:
+                    print(f"\033[90m    ... and {len(found_domains) - 5} more\033[0m")
+            else:
+                print(f"\033[93m[!] No additional domains found for organization '{organization}'\033[0m")
+                
+        except subprocess.CalledProcessError as e:
+            print(f"\033[91m[!] ViewDNS.info lookup failed: {e}\033[0m")
+        except Exception as e:
+            print(f"\033[91m[!] Error during ViewDNS.info lookup: {str(e)}\033[0m")
+    else:
+        print(f"\033[93m[-] Skipping ViewDNS.info lookup (no organization found)\033[0m")
+    
+    # Étape 3: Sauvegarder tous les domaines trouvés
+    print(f"\033[94m[-] Step 3: Saving results to intel_output.txt...\033[0m")
+    
+    try:
+        with open(intel_output_file, "w") as f:
+            for found_domain in sorted(domains_found):
+                f.write(f"{found_domain}\n")
+        
+        print(f"\033[92m[+] Intelligence gathering completed!\033[0m")
+        print(f"\033[92m[+] {len(domains_found)} domains saved to {intel_output_file}\033[0m")
+        
+        # Afficher le résumé
+        print("\033[96mDomains found:\033[0m")
+        for found_domain in sorted(domains_found):
+            print(f"\033[90m  • {found_domain}\033[0m")
+            
+    except Exception as e:
+        print(f"\033[91m[!] Failed to save intel output: {e}\033[0m")
+
+
+def run_subfinder(domain: str, amass_dir: str, subfinder_dir: str) -> None:
+    """Run subfinder tool to find subdomains."""
+    print("\n" + "="*60)
+    print("\033[96m[-] STEP 1: SUBFINDER - Subdomain discovery\033[0m")
+    print("="*60)
+    print("\033[90mBefore running this tool, you must configure your API keys/tokens in the config file. (See subfinder documentation)\033[0m")
+    confirmation = input(f"\033[93m[?] Do you want to run subfinder for {domain}? (yes/no): \033[0m").strip().lower()
+    
+    if confirmation != "yes":
+        print(f"\033[93m[-] Skipping subfinder for {domain}.\033[0m")
+        print("\033[94m    [>] Moving to next step...\033[0m")
+        return
+
+    subfinder_command = ["subfinder", "-all", "-dL", f"{amass_dir}/intel_output.txt", "-oJ"]
+
+    print(f"\033[94m[-] Running subfinder for {domain}...\033[0m")
+    print(f"\033[90mSubfinder command: {' '.join(subfinder_command)} >> {subfinder_dir}/subfinder_output.json\033[0m")
+    
+    try: 
+        result = subprocess.run(subfinder_command, check=True, capture_output=True, text=True)
+        
+        # Écrire la sortie JSON dans le fichier
+        with open(f"{subfinder_dir}/subfinder_output.json", "a") as f:
+            f.write(result.stdout)
+        print(f"\033[92m[+] Subfinder output saved to {subfinder_dir}/subfinder_output.json\033[0m")
+        
+        if result.stdout:
+            print(f"\033[90mSubfinder stdout:\n{result.stdout}\033[0m")
+        if result.stderr:  
+            print(f"\033[90mSubfinder stderr:\n{result.stderr}\033[0m")
+    except subprocess.CalledProcessError as e:
+        print(f"\033[91m[!] Subfinder command failed: {e}\033[0m")
+        print(f"\033[90mCommand: {' '.join(e.cmd)}\033[0m")
+        if e.stdout:
+            print(f"\033[90mStdout:\n{e.stdout}\033[0m")
+        if e.stderr:
+            print(f"\033[91mStderr:\n{e.stderr}\033[0m")
+        return
 
 def amass_viz(db_dir: str) -> None:
     """Run amass viz command to generate D3 visualization."""
@@ -185,42 +352,7 @@ def amass_viz(db_dir: str) -> None:
             print(f"\033[91mStderr:\n{e.stderr}\033[0m")
         # Gérer l'échec si nécessaire
 
-def run_intel_command(domain: str, amass_dir: str) -> None:
-    """Run amass intel command to gather intelligence on the domain."""
-    print("\n" + "="*60)
-    print("\033[96m[-] STEP 1/5: AMASS INTEL - Information gathering\033[0m")
-    print("="*60)
-    
-    confirmation = input(f"\033[93m[?] Do you want to run amass intel for {domain}? (yes/no): \033[0m").strip().lower()
-    
-    if confirmation != "yes":
-        print(f"\033[93m[-] Skipping amass intel for {domain}.\033[0m")
-        print("\033[94m    [>] Moving to next step...\033[0m")
-        return
-    
-    mode = input("Enter the mode for amass intel (passive/active): ").strip().lower()
-    
-    intel_command = [
-        "amass", "intel", "-d", domain, "-whois", "-o", f"{amass_dir}/intel_output.txt"
-    ]
-    
-    if mode == "active": # Insérer l'option après "intel"
-        intel_command.insert(2, "-active")
-    
-    print(f"\033[94m[-] Running amass intel for {domain}...\033[0m")
-    print(f"\033[90mAmass intel command: {' '.join(intel_command)}\033[0m")
-    try:
-        subprocess.run(intel_command, check=True, capture_output=True, text=True)  
-        print(f"\033[92m[+] Amass intel output saved to {amass_dir}/intel_output.txt\033[0m")
-        print("\033[96mResults are : \033[0m")
-        with open(f"{amass_dir}/intel_output.txt", "r") as file:
-            intel_output = file.read()
-            print(intel_output)
-
-    except subprocess.CalledProcessError as e:
-        print(f"\033[91m[!] Amass intel command failed: {e}\033[0m")
-        print(f"\033[91mError output (stderr): {e.stderr}\033[0m")
-    
+  
 
 
 
@@ -229,7 +361,7 @@ def run_intel_command(domain: str, amass_dir: str) -> None:
 def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None:
     """Run amass tool."""
     print("\n" + "="*60)
-    print("\033[96m[-] STEP 2/5: AMASS ENUM - Subdomain enumeration\033[0m")
+    print("\033[96m[-] STEP 3: AMASS ENUM - Subdomain enumeration\033[0m")
     print("="*60)
     
     confirmation = input(f"\033[93m[?] Do you want to run amass enum for {domain}? (yes/no): \033[0m").strip().lower()
@@ -313,7 +445,7 @@ def run_enum_amass(domain: str, amass_dir: str, scan_type: str) -> None:
 def run_nmap(domain: str,  amass_dir: str, nmap_dir: str) -> None:
     """Run nmap tool."""
     print("\n" + "="*60)
-    print("\033[96m[-] STEP 3/5: NMAP - Port and service scanning\033[0m")
+    print("\033[96m[-] STEP 4: NMAP - Port and service scanning\033[0m")
     print("="*60)
     
     confirmation = input(f"\033[93m[?] Do you want to run nmap for {domain}? (yes/no): \033[0m").strip().lower()
@@ -394,7 +526,7 @@ def run_nmap(domain: str,  amass_dir: str, nmap_dir: str) -> None:
 def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
     """Run checkdmarc tool."""
     print("\n" + "="*60)
-    print(f"\033[96m[-] STEP 4/5: CheckDMARC Analysis - {domain}\033[0m")
+    print(f"\033[96m[-] STEP 5: CheckDMARC Analysis - {domain}\033[0m")
     print("="*60)
     
     original_domain = domain  # Sauvegarder le domaine original
@@ -497,7 +629,7 @@ def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
 def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
     """Run testssl tool with progress tracking and existing file detection."""
     print("\n" + "="*60)
-    print(f"\033[96m[-] STEP 5/5: TestSSL Analysis - {domain}\033[0m")
+    print(f"\033[96m[-] STEP 6: TestSSL Analysis - {domain}\033[0m")
     print("="*60)
     
     original_domain = domain  # Sauvegarder le domaine original
@@ -757,15 +889,18 @@ def main():
         return
     
     amass_dir = output_dirs["amass"]
+    subfinder_dir = output_dirs["subfinder"]
     nmap_dir = output_dirs["nmap"]
     testssl_dir = output_dirs["testssl"]
     chekcdmarc_dir = output_dirs["checkdmarc"]
 
     run_intel_command(domain, amass_dir)
+    run_subfinder(domain, amass_dir, subfinder_dir)
     run_enum_amass(domain, amass_dir, scan_type)
     run_nmap(domain, amass_dir, nmap_dir)
     run_checkdmarc(domain, amass_dir, chekcdmarc_dir)
     run_testssl(domain, amass_dir, testssl_dir)
+    
     print("\033[92m[+] Automation script completed successfully.\033[0m")
 
 if __name__ == "__main__":
