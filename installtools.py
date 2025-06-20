@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔧 ULTRA-ROBUST BOC Tools Installation Script
+ ULTRA-ROBUST BOC Tools Installation Script
 ============================================
 
 This script handles ALL possible installation scenarios and error cases with 
@@ -39,7 +39,7 @@ import urllib.request
 import urllib.error
 
 # =============================================================================
-# 🚀 CONFIGURATION AND LOGGING SETUP
+#  CONFIGURATION AND LOGGING SETUP
 # =============================================================================
 
 # Configure comprehensive logging
@@ -91,7 +91,7 @@ class Colors:
     UNDERLINE = '\033[4m'
 
 # =============================================================================
-# 🛠️ CORE UTILITY FUNCTIONS
+# ️ CORE UTILITY FUNCTIONS
 # =============================================================================
 
 @contextmanager
@@ -112,7 +112,7 @@ def print_banner(text: str, color: str = Colors.HEADER) -> None:
     """Print a beautiful banner with color."""
     border = "=" * 80
     print(f"\n{color}{border}")
-    print(f"🚀 {text}")
+    print(f" {text}")
     print(f"{border}{Colors.ENDC}")
 
 def print_step(step_num: int, total_steps: int, description: str) -> None:
@@ -326,7 +326,7 @@ def install_to_venv(venv_path: str, packages: List[str], upgrade: bool = True) -
     return success_count == len(packages)
 
 # =============================================================================
-# 🔧 INSTALLATION MANAGER CLASS
+#  INSTALLATION MANAGER CLASS
 # =============================================================================
 
 class RobustInstaller:
@@ -771,7 +771,7 @@ except ImportError as e:
     def _install_testssl(self) -> bool:
         """Install testssl.sh manually."""
         try:
-            subprocess.run("sudo", "apt", "install", "-y", "testssl.sh", check=True)
+            subprocess.run(["sudo", "apt", "install", "-y", "testssl.sh"], check=True)
             return True
         except subprocess.CalledProcessError:
             logger.warning("Failed to install testssl.sh via package manager, trying manual installation")
@@ -1016,8 +1016,8 @@ except ImportError as e:
     def run_complete_installation(self) -> bool:
         """Run the complete installation process."""
         print_banner("BOC TOOLS ULTRA-ROBUST INSTALLATION")
-        print("🎯 Installing ALL dependencies with maximum compatibility")
-        print("🔧 Multiple fallback methods for each component")
+        print(" Installing ALL dependencies with maximum compatibility")
+        print(" Multiple fallback methods for each component")
         print("⚡ Handles externally-managed Python environments")
         
         installation_steps = [
@@ -1059,13 +1059,13 @@ except ImportError as e:
         
         if success_rate >= 0.8:
             print_success(f"Installation completed successfully! ({success_count}/{total_steps} steps)")
-            print("\n🎉 You can now use:")
+            print("\n You can now use:")
             print("  • python3 automation.py - for comprehensive security scanning")
             print("  • python3 checkdmarc_enhanced.py -excel - for Excel reports")
             print("  • All security tools: amass, nmap, testssl.sh")
             print("  • Python tools: checkdmarc, dnstwist")
             
-            print("\n📋 Next steps:")
+            print("\n Next steps:")
             print("  1. Restart your terminal: source ~/.bashrc")
             print("  2. Test: python3 automation.py --help")
             print("  3. Test Excel: python3 checkdmarc_enhanced.py sample.json -excel")
@@ -1075,7 +1075,7 @@ except ImportError as e:
             print("Some components may not work correctly.")
             print("Check the log file 'boc_tools_install.log' for details.")
             
-        print("\n📁 Created virtual environments:")
+        print("\n Created virtual environments:")
         print("  • ./venv_excel/ - Excel reporting dependencies")
         print("  • ~/.local/venvs/checkdmarc_env/ - checkdmarc tool")
         print("  • ~/.local/venvs/dnstwist_env/ - dnstwist tool")
@@ -1286,7 +1286,7 @@ except ImportError as e:
             return False
 
 # =============================================================================
-# 🚀 MAIN EXECUTION
+#  MAIN EXECUTION
 # =============================================================================
 
 def main():
