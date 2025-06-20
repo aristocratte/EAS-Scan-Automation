@@ -510,7 +510,7 @@ def run_nmap(domain: str,  amass_dir: str, nmap_dir: str) -> None:
             print("\033[94m    [>] Moving to next step...\033[0m")
             return
     elif mode == "passive":
-        nmap_command.extend(["-T3", "-Pn", "--top-ports", "100", "--open"])
+        nmap_command.extend(["-sV", "-T3", "-Pn", "--top-ports", "100", "--open"])
     else:
         print("\033[91m[!] Invalid mode. Please enter 'passive' or 'active'.\033[0m")
         print("\033[94m    [>] Moving to next step...\033[0m")
