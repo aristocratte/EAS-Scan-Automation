@@ -300,19 +300,18 @@ def run_subfinder(domain: str, amass_dir: str, subfinder_dir: str) -> None:
         print("\033[94m    [>] Moving to next step...\033[0m")
         return
 
-    subfinder_command = ["subfinder", "-all", "-dL", f"{amass_dir}/intel_output.txt", "-oJ"]
+    subfinder_command = ["subfinder", "-all", "-dL", f"{amass_dir}/intel_output.txt", "-o", f"{subfinder_dir}/subfinder_output.txt", "-silent"]
+    copy_command = ["sudo", "cp", f"{subfinder_dir}/subfinder_output.txt", f"{amass_dir}/subfinder_output.txt"]
+    print(f"\033[90mSubfinder command: {' '.join(subfinder_command)}\033[0m")
+    print(f"\033[90mCopy command: {' '.join(copy_command)}\033[0m")
 
     print(f"\033[94m[-] Running subfinder for {domain}...\033[0m")
-    print(f"\033[90mSubfinder command: {' '.join(subfinder_command)} >> {subfinder_dir}/subfinder_output.json\033[0m")
     
     try: 
         result = subprocess.run(subfinder_command, check=True, capture_output=True, text=True)
         
-        # Écrire la sortie JSON dans le fichier
-        with open(f"{subfinder_dir}/subfinder_output.json", "a") as f:
-            f.write(result.stdout)
-        print(f"\033[92m[+] Subfinder output saved to {subfinder_dir}/subfinder_output.json\033[0m")
-        
+        print(f"\033[96m[-] Copying subfinder output to {amass_dir}...\033[0m")
+        subprocess.run(copy_command, check=True, capture_output=True, text=True)
         if result.stdout:
             print(f"\033[90mSubfinder stdout:\n{result.stdout}\033[0m")
         if result.stderr:  
@@ -457,18 +456,37 @@ def run_nmap(domain: str,  amass_dir: str, nmap_dir: str) -> None:
     
     original_domain = domain  # Sauvegarder le domaine original
     use_file_list = False
+    live_hosts = ""
 
     subdomain_list = input("Is your scan only a domain (1) or a list of subdomains (2) ? (1/2): ")
+    
     if subdomain_list == "2":
-        live_hosts = os.path.join(amass_dir, "amass_output.txt")
-        if not os.path.isfile(live_hosts):
-            print(f"\033[91m[!] amass_output.txt not found in {amass_dir}. Please run amass first.\033[0m")
+        list_choice = input("Do you want to use amass output (1) or subfinder output (2) ? (1/2): ")
+        
+        if list_choice == "1":
+            live_hosts = os.path.join(amass_dir, "amass_output.txt")
+            if not os.path.isfile(live_hosts):
+                print(f"\033[91m[!] amass_output.txt not found in {amass_dir}. Please run amass first.\033[0m")
+                print("\033[94m    [>] Moving to next step...\033[0m")
+                return
+            print(f"\033[96m[-] Using amass_output.txt from {amass_dir} for nmap scan.\033[0m")
+        elif list_choice == "2":
+            live_hosts = os.path.join(amass_dir, "subfinder_output.txt")
+            if not os.path.isfile(live_hosts):
+                print(f"\033[91m[!] subfinder_output.txt not found in {amass_dir}. Please run subfinder first.\033[0m")
+                print("\033[94m    [>] Moving to next step...\033[0m")
+                return
+            print(f"\033[96m[-] Using subfinder_output.txt from {amass_dir} for nmap scan.\033[0m")
+        else:
+            print("\033[91m[!] Invalid choice. Please enter '1' or '2'.\033[0m")
             print("\033[94m    [>] Moving to next step...\033[0m")
             return
-        print(f"\033[96m[-] Using amass_output.txt from {amass_dir} for nmap scan.\033[0m")
+        
         use_file_list = True
+        
     elif subdomain_list == "1":
         live_hosts = original_domain
+        use_file_list = False
     else:
         print("\033[91m[!] Invalid choice. Please enter '1' or '2'.\033[0m")
         print("\033[94m    [>] Moving to next step...\033[0m")
@@ -531,8 +549,12 @@ def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
     
     original_domain = domain  # Sauvegarder le domaine original
     use_file_list = False
+    amass_list = "amass_output.txt"
+    subfinder_list = "subfinder_output.txt"
 
     confirmation = input(f"\033[93m[?] Do you want to run checkdmarc for {domain} ? (yes/no): \033[0m").strip().lower()
+    
+
     if confirmation != "yes":
         print(f"\033[93m[-] Skipping checkdmarc for {domain}.\033[0m")
         print("\033[94m    [>] Moving to next step...\033[0m")
@@ -540,14 +562,31 @@ def run_checkdmarc(domain: str, amass_dir: str, checkdmarc_dir: str) -> None:
 
 
     subdomain_list = input("Is your scan only a domain (1) or a list of subdomains (2) ? (1/2): ")
+    
     if subdomain_list == "2":
-        subdomain_file = os.path.join(amass_dir, "amass_output.txt")
-        if not os.path.isfile(subdomain_file):
-            print(f"\033[91m[!] amass_output.txt not found in {amass_dir}. Please run amass first.\033[0m")
+        list_choice = input("Do you want to use amass output (1) or subfinder output (2) ? (1/2): ")
+        
+        if list_choice == "1":
+            subdomain_file = os.path.join(amass_dir, "amass_output.txt")
+            if not os.path.isfile(subdomain_file):
+                print(f"\033[91m[!] amass_output.txt not found in {amass_dir}. Please run amass first.\033[0m")
+                print("\033[94m    [>] Moving to next step...\033[0m")
+                return
+            print(f"\033[96m[-] Using amass_output.txt from {amass_dir} for checkdmarc scan.\033[0m")
+        elif list_choice == "2":
+            subdomain_file = os.path.join(amass_dir, "subfinder_output.txt")
+            if not os.path.isfile(subdomain_file):
+                print(f"\033[91m[!] subfinder_output.txt not found in {amass_dir}. Please run subfinder first.\033[0m")
+                print("\033[94m    [>] Moving to next step...\033[0m")
+                return
+            print(f"\033[96m[-] Using subfinder_output.txt from {amass_dir} for checkdmarc scan.\033[0m")
+        else:
+            print("\033[91m[!] Invalid choice. Please enter '1' or '2'.\033[0m")
             print("\033[94m    [>] Moving to next step...\033[0m")
             return
-        print(f"\033[96m[-] Using amass_output.txt from {amass_dir} for checkdmarc scan.\033[0m")
+        
         use_file_list = True
+        
     elif subdomain_list == "1":
         use_file_list = False
     else:
@@ -634,6 +673,8 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
     
     original_domain = domain  # Sauvegarder le domaine original
     use_file_list = False
+    amass_list = "amass_output.txt"
+    subfinder_list = "subfinder_output.txt"
 
     confirmation = input(f"\033[93m[?] Do you want to run testssl for {domain} ? (yes/no): \033[0m").strip().lower()
     
@@ -643,14 +684,31 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
         return
 
     subdomain_list = input("Is your scan only a domain (1) or a list of subdomains (2) ? (1/2): ")
+    
     if subdomain_list == "2":
-        subdomain_file = os.path.join(amass_dir, "amass_output.txt")
-        if not os.path.isfile(subdomain_file):
-            print(f"\033[91m[!] amass_output.txt not found in {amass_dir}. Please run amass first.\033[0m")
-            print("\033[94m    [>] TestSSL scan completed (missing file)\033[0m")
+        list_choice = input("Do you want to use amass output (1) or subfinder output (2) ? (1/2): ")
+        
+        if list_choice == "1":
+            subdomain_file = os.path.join(amass_dir, "amass_output.txt")
+            if not os.path.isfile(subdomain_file):
+                print(f"\033[91m[!] amass_output.txt not found in {amass_dir}. Please run amass first.\033[0m")
+                print("\033[94m    [>] TestSSL scan completed (missing file)\033[0m")
+                return
+            print(f"\033[96m[-] Using amass_output.txt from {amass_dir} for testssl scan.\033[0m")
+        elif list_choice == "2":
+            subdomain_file = os.path.join(amass_dir, "subfinder_output.txt")
+            if not os.path.isfile(subdomain_file):
+                print(f"\033[91m[!] subfinder_output.txt not found in {amass_dir}. Please run subfinder first.\033[0m")
+                print("\033[94m    [>] TestSSL scan completed (missing file)\033[0m")
+                return
+            print(f"\033[96m[-] Using subfinder_output.txt from {amass_dir} for testssl scan.\033[0m")
+        else:
+            print("\033[91m[!] Invalid choice. Please enter '1' or '2'.\033[0m")
+            print("\033[94m    [>] TestSSL scan completed (invalid choice)\033[0m")
             return
-        print(f"\033[96m[-] Using amass_output.txt from {amass_dir} for testssl scan.\033[0m")
+        
         use_file_list = True
+        
     elif subdomain_list == "1":
         use_file_list = False
     else:
@@ -701,9 +759,9 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
     
     # Afficher le résumé du pré-scan
     print(f"\033[96m[INFO] Pre-scan results:\033[0m")
-    print(f"  📊 Total targets: {len(targets_to_scan)}")
+    print(f"   Total targets: {len(targets_to_scan)}")
     print(f"  ✅ Existing scans: {len(existing_files)}")
-    print(f"  🆕 New scans needed: {len(new_scans_needed)}")
+    print(f"   New scans needed: {len(new_scans_needed)}")
     
     # Gestion des fichiers existants
     skip_existing = False
@@ -797,7 +855,7 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
                 continue
                 
             except Exception as e:
-                print(f"    \033[91m💥 Error: {str(e)[:50]}...\033[0m")
+                print(f"    \033[91m Error: {str(e)[:50]}...\033[0m")
                 failed_scans += 1
                 continue
         
@@ -805,7 +863,7 @@ def run_testssl(domain: str, amass_dir: str, testssl_dir: str) -> None:
         print(f"\n\033[94m[SCAN SUMMARY]\033[0m")
         print(f"  ✅ Successful scans: {successful_scans}")
         print(f"  ❌ Failed scans: {failed_scans}")
-        print(f"  📊 Total processed: {len(targets_to_scan)}")
+        print(f"   Total processed: {len(targets_to_scan)}")
         
         if successful_scans > 0:
             print("\033[92m    [+] TestSSL scanning completed successfully !\033[0m")
